@@ -139,7 +139,7 @@ services:
           new: "REPLACE_WITH_THIS"             # Required if type="replace". Replace with this text.
           text: "ABC"                          # Required if type="split". Split on this text.
       regex_content: "abc-[a-z]+-${version}_amd64.deb"  # Optional. This regex must exist on the URL content to be classed as a new release.
-      regex_version: '^v[0-9.]+$'                        # Optional. The version found must contain matching regex to be classed as a new release.
+      regex_version: '^v[0-9.]+$'                       # Optional. The version found must contain matching regex to be classed as a new release.
       allow_invalid: false                              # Optional. Allow invalid HTTPS Certificates.
       access_token: 'GITHUB_ACCESS_TOKEN'               # Optional. GitHub access token to use. Allows smaller interval (higher API rate limit).
       skip_slack: false                                 # Optional. Don't send Slack messages for new releases of this monitor.
@@ -192,7 +192,7 @@ message:
 ```
 The values of the optional arguments are the default values.
 
-##Output
+## Output
 ```bash
 $ release_notifier -config myConfig.yml
 2021/06/08 10:34:53 INFO: 5 sites to monitor:
