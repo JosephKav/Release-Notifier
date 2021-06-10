@@ -1,0 +1,171 @@
+package main
+
+import (
+	"bytes"
+	"context"
+	"encoding/json"
+	"fmt"
+	"io/ioutil"
+	"log"
+	"net/http"
+	"strings"
+	"time"
+)
+
+// SlackSlice is an array of Slack's.
+type SlackSlice []Slack
+
+// Slack is a Slack message w/ destination and from details.
+type Slack struct {
+	URL       string `yaml:"url"`        // "https://example.com
+	Message   string `yaml:"message"`    // "${monitor} - ${version} released"
+	Username  string `yaml:"username"`   // "Release Notifier"
+	IconEmoji string `yaml:"icon"`       // ":github:"
+	MaxTries  int    `yaml:"maxretries"` // Number of times to attempt sending the Slack message if a 200 is not received.
+}
+
+// UnmarshalYAML allows handling of a dict as well as a list of dicts.
+//
+// It will convert a dict to a list of a dict.
+//
+// e.g.    Slack: { url: "example.com" }
+//
+// becomes Slack: [ { url: "example.com" } ]
+func (s *SlackSlice) UnmarshalYAML(unmarshal func(interface{}) error) error {
+	var multi []Slack
+	err := unmarshal(&multi)
+	if err != nil {
+		var single Slack
+		err := unmarshal(&single)
+		if err != nil {
+			return err
+		}
+		*s = []Slack{single}
+	} else {
+		*s = multi
+	}
+	return nil
+}
+
+// setDefaults calls setDefaults on each Slack to set the defaults for undefined values.
+func (s *SlackSlice) setDefaults(defaults Defaults) {
+	for SlackIndex := range *s {
+		(*s)[SlackIndex].setDefaults(defaults)
+	}
+}
+
+// setDefaults sets the defaults for each undefined var using defaults.
+func (s *Slack) setDefaults(defaults Defaults) {
+	if s.Message == "" {
+		s.Message = defaults.Slack.Message
+	}
+
+	if s.Username == "" {
+		s.Username = defaults.Slack.Username
+	}
+
+	if s.IconEmoji == "" {
+		s.IconEmoji = defaults.Slack.IconEmoji
+	}
+
+	if s.MaxTries == 0 {
+		s.MaxTries = defaults.Slack.MaxTries
+	}
+}
+
+// SlackPayload is the payload to be to be sent as the Slack message.
+type SlackPayload struct {
+	Username  string `json:"username"`   // "Release Notifier"
+	IconEmoji string `json:"icon_emoji"` // ":github:"
+	Text      string `json:"text"`       // "${monitor} - ${version} released"
+}
+
+// send will send every slack message in this SlackSlice.
+func (s *SlackSlice) send(serviceID string, mon *Monitor) {
+	for index := range *s {
+		// Send each Slack message up to s.MaxRetries number of times until they 200
+		go func() {
+			index := index                    // Create new instance for the goroutine.
+			triesLeft := (*s)[index].MaxTries // Number of times to send WebHook (until 200 received).
+			for {
+				err := (*s)[index].send(serviceID, mon)
+
+				// SUCCESS
+				if err == nil {
+					break
+				}
+
+				// FAIL
+				triesLeft--
+				// Give up after MaxRetries
+				if triesLeft == 0 {
+					// If not verbose (this would already have been printed in verbose)
+					if !*verbose {
+						log.Printf("ERROR: %s", err)
+					}
+					log.Printf("ERROR: %s, Failed %d times to send slack message to %s", serviceID, (*s)[index].MaxTries, (*s)[index].URL)
+					break
+				}
+				// Space out retries
+				time.Sleep(10 * time.Second)
+			}
+		}()
+		// Space out Slack messages
+		time.Sleep(3 * time.Second)
+	}
+}
+
+// send sends a formatted Slack notification regarding m.
+func (s *Slack) send(serviceID string, mon *Monitor) error {
+	payload := SlackPayload{
+		Username:  s.Username,
+		IconEmoji: s.IconEmoji,
+		Text:      s.Message,
+	}
+	mURL := mon.URL
+
+	// GitHub monitor. Get the non-API URL.
+	if mon.Type == "github" {
+		mURL = strings.Split(mon.URL, "github.com/repos/")[1]
+		mURL = fmt.Sprintf("https://github.com/%s/%s", strings.Split(mURL, "/")[0], strings.Split(mURL, "/")[1])
+	}
+
+	payload.Text = strings.ReplaceAll(payload.Text, "${service}", serviceID)
+	payload.Text = strings.ReplaceAll(payload.Text, "${monitor_url}", mURL)
+	payload.Text = strings.ReplaceAll(payload.Text, "${monitor_id}", mon.ID)
+	payload.Text = strings.ReplaceAll(payload.Text, "${version}", mon.status.version)
+
+	payloadData, err := json.Marshal(payload)
+	if err != nil {
+		return err
+	}
+
+	req, err := http.NewRequest(http.MethodPost, s.URL, bytes.NewReader(payloadData))
+	if err != nil {
+		return err
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	req = req.WithContext(ctx)
+	defer cancel()
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+
+	// SUCCESS
+	if resp.StatusCode == http.StatusOK {
+		log.Printf("INFO: %s, Slack message sent", serviceID)
+		return nil
+	}
+
+	// FAIL
+	body, _ := ioutil.ReadAll(resp.Body)
+	if *verbose {
+		log.Printf("ERROR: Slack request didn't respond with 200 OK: %s, %s", resp.Status, body)
+	}
+	return fmt.Errorf("Slack request didn't respond with 200 OK: %s, %s", resp.Status, body)
+
+}
