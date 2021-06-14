@@ -3,6 +3,38 @@
 Release-Notifier will query websites at a user defined interval for new software releases and then trigger a WebHook/Slack notification when one has been found.
 For example, you could set it to monitor the Gitea repo ([go-gitea/gitea](https://github.com/go-gitea/gitea)). This will query the [GitHub API](https://api.github.com/repos/go-gitea/gitea/releases/latest) and track the "tag_name" variable. When this variable changes from what it was on a previous query, an AWX 'GitHub' WebHook could be triggered to update Gitea on your server.
 
+##### Table of Contents
+- [Release-Notifier](#release-notifier)
+  * [Output](#output)
+  * [Command-line arguments](#command-line-arguments)
+  * [Config formatting](#config-formatting)
+      - [Example](#example)
+      - [Defaults](#defaults)
+        * [Example](#example-1)
+        * [Monitor](#defaults---monitor)
+        * [Slack](#defaults---slack)
+        * [WebHook](#defaults---webhook)
+      - [Services](#services)
+        * [Example](#example-2)
+        * [Monitor](#services---monitor)
+        * [Slack](#services---slack)
+        * [WebHook](#services---webhook)
+
+## Output
+```bash
+$ release_notifier -config myConfig.yml
+2021/06/08 10:34:53 INFO: 5 sites to monitor:
+2021/06/08 10:34:53 INFO: ansible/awx-operator, go-gitea/gitea, grafana/grafana, mattermost/mattermost-server, prometheus/prometheus
+2021/06/08 10:34:54 INFO: ansible/awx-operator, Starting Release - 0.10.0
+2021/06/08 10:36:27 INFO: go-gitea/gitea, Starting Release - v1.14.2
+2021/06/08 10:36:42 INFO: grafana/grafana, Starting Release - v8.0.0
+2021/06/08 10:36:52 INFO: mattermost/mattermost-server, Starting Release - 5.35.2
+2021/06/08 10:37:08 INFO: prometheus/prometheus, Starting Release - v2.27.1
+2021/06/10 16:13:49 INFO: grafana/grafana, New Release - v8.0.1
+2021/06/10 16:13:49 INFO: Grafana, Slack message sent
+2021/06/10 16:13:50 INFO: Grafana, WebHook received (202)
+```
+
 ## Command-line arguments
 ```bash
 $ release_notifier -h
@@ -14,12 +46,12 @@ Usage of /usr/local/bin/release_notifier:
 ```
 
 ## Config formatting
-Example config.yml:
+#### Example
 ```yaml
 defaults:
   monitor:
     interval: 600
-    access_token: 'GITHUB_ACCESS_TOKEN' # Allows smaller intervals (higher API rate limit) as well as private repo queries.
+    access_token: 'GITHUB_ACCESS_TOKEN'
   slack:
     message: '<${monitor_url}|${monitor_id}> - ${version} released'
     username: 'Release Notifier'
@@ -51,16 +83,34 @@ services:
     slack:
       url: https://SLACK_INCOMING_WEBHOOK
 ```
+ Above, I set defaults.monitor.interval to 600 and then don't define an interval for the golang/go monitor. Therefore, this monitor will follow defaults.monitor.interval and query the site every 600 seconds. But, I can override that interval by stating it, for example in the adnanh/webhook monitor, I have set interval to 300 and so that page will be queried every 300 seconds.
+
 #### Defaults
-You can set global defaults for Monitors, WebHooks and Slack messages in the defaults section. In the examples below, the values set in defaults are the values set in the code that will be used if they haven't been included in the service being monitored or the config defaults.
+Defaults are not needed in the config, but you can override the coded defaults with your own defaults for Monitors, WebHooks and Slack messages in this defaults section. In the examples below, the values set are the coded defaults that will be used if they haven't been included in the service being monitored or the config defaults. (excluding access_token)
+
+##### Example
+```yaml
+defaults:
+  monitor:
+    interval: 600
+    access_token: 'GITHUB_ACCESS_TOKEN'
+  slack:
+    message: '<${monitor_url}|${monitor_id}> - ${version} released'
+    username: 'Release Notifier'
+    icon_emoji: ':github:'
+    maxtries: 3
+  webhook:
+    desired_status_code: 0
+    maxtries: 3
+```
+
 ##### Defaults - Monitor
 ```yaml
 defaults:
   monitor:
     interval: 600                      # Time between monitor queries.
-    access_token: GITHUB_ACCESS_TOKEN  # Increase API rate limit with an access token. Used when type=github
+    access_token: 'GITHUB_ACCESS_TOKEN'  # Increase API rate limit with an access token (and allow querying private repo's). Used when type="github".
 ```
- Above, I set defaults.monitor.interval to 600 and then don't define an interval for the golang/go monitor. Therefore, this monitor will query the site every 600 seconds. But, I can override that interval by stating it, for example in the adnanh/webhook monitor, I have set interval to 300 and so that page will be queried every 300 seconds.
 
 ##### Defaults - Slack
 ```yaml
@@ -85,6 +135,7 @@ defaults:
 ```
 
 #### Services
+##### Example
 ```yaml
 services:
   - id: CV-Site
@@ -121,7 +172,7 @@ services:
       url: https://AWX_HOSTNAME/api/v2/job_templates/36/github/
       secret: SECRET
 ```
-This program can monitor multiple services. Just provide them in the standard yaml list format like above. It can also monitor multiple sites (if the same style Slack message(s) and webhook(s) are wanted), send multiple Slack messages and or github style webhooks when a new release is found. Just turn the monitor, webhook and Slack sections into yaml lists. Note, if you don't have multiple Slack messages, multiple webhooks or multiple sites/repos under the same service, you don't have to format it as a list. This can be seen in the Gitea example above (they don't all need to be lists. e.g. you could have a list of monitors with a single webhook that isn't formatted as a list).
+This program can monitor multiple services. Just provide them in the standard yaml list format like above. It can also monitor multiple sites (if the same style Slack message(s) and webhook(s) are wanted), and can send multiple Slack messages and/or github style webhooks when a new release is found. Just turn the monitor, webhook and Slack sections into yaml lists. Note, if you don't have multiple Slack messages, multiple webhooks or multiple sites/repos under the same service, you don't have to format it as a list. This can be seen in the Gitea example above (they don't all need to be lists. e.g. you could have a list of monitors with a single webhook that isn't formatted as a list).
 
 ##### Services - Monitor
 ```yaml
@@ -191,18 +242,3 @@ message:
       maxtries: 3             # Optional. Number of times to try re-sending WebHooks until we receive desired_status_code
 ```
 The values of the optional arguments are the default values.
-
-## Output
-```bash
-$ release_notifier -config myConfig.yml
-2021/06/08 10:34:53 INFO: 5 sites to monitor:
-2021/06/08 10:34:53 INFO: ansible/awx-operator, go-gitea/gitea, grafana/grafana, mattermost/mattermost-server, prometheus/prometheus
-2021/06/08 10:34:54 INFO: ansible/awx-operator, Starting Release - 0.10.0
-2021/06/08 10:36:27 INFO: go-gitea/gitea, Starting Release - v1.14.2
-2021/06/08 10:36:42 INFO: grafana/grafana, Starting Release - v8.0.0
-2021/06/08 10:36:52 INFO: mattermost/mattermost-server, Starting Release - 5.35.2
-2021/06/08 10:37:08 INFO: prometheus/prometheus, Starting Release - v2.27.1
-2021/06/10 16:13:49 INFO: grafana/grafana, New Release - v8.0.1
-2021/06/10 16:13:49 INFO: Grafana, Slack message sent
-2021/06/10 16:13:50 INFO: Grafana, WebHook received (202)
-```
