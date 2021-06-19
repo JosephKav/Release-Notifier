@@ -130,7 +130,7 @@ message - Each element of the monitor array can trigger a Slack message. This is
 ```yaml
 defaults:
   webhook:
-    desired_status_code: 0  # Status code indicating a success. Send maxtries # of times until we receive this. 0 = accept any.
+    desired_status_code: 0  # Status code indicating a success. Send maxtries # of times until we receive this. 0 = accept any 2XX code.
     maxtries: 3             # Number of times to resend until desired_status_code is received.
 ```
 
@@ -218,7 +218,7 @@ services:
       message: '<${monitor_url}|${monitor_id}> - ${version} released'  # Optional. Formatting of the message to send.
       username: 'Release Notifier'                                     # Optional. The user to message as.
       icon_emoji: ':github:'                                           # Optional. The icon of that user.
-      maxtries: 3                                                      # Optional. The number of times to resend until 200 status code is received.
+      maxtries: 3                                                      # Optional. The number of times to resend until a 2XX status code is received.
 ```
 The values of the optional arguments are the default values.
 
@@ -238,7 +238,7 @@ message:
       type: "github"          # Required. The type of WebHook to send (Currently only github is supported).
       url: "WEBHOOK_URL"      # Required. The URL to send the WebHook to.
       secret: "SECRET"        # Required. The secret to send the WebHook with.
-      desired_status_code: 0  # Optional. Keep sending the WebHooks until we recieve this status code (0 = accept all).
+      desired_status_code: 0  # Optional. Keep sending the WebHooks until we recieve this status code (0 = accept any 2XX code).
       maxtries: 3             # Optional. Number of times to try re-sending WebHooks until we receive desired_status_code
 ```
 The values of the optional arguments are the default values.

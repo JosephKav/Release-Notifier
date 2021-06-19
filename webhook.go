@@ -13,7 +13,7 @@ import (
 	"log"
 	"math/rand"
 	"net/http"
-
+	"strconv"
 	"time"
 )
 
@@ -26,7 +26,7 @@ type WebHook struct {
 	URL               string `yaml:"url"`                 // "https://example.com"
 	Secret            string `yaml:"secret"`              // "SECRET"
 	DesiredStatusCode int    `yaml:"desired_status_code"` // e.g. 202
-	MaxTries          int    `yaml:"maxtries"`            // Number of times to attempt sending the WebHook if the desired status code is not received.
+	MaxTries          int    `yaml:"maxtries"`            // Number of times to send the WebHook if desired_status_code is not received.
 }
 
 // UnmarshalYAML allows handling of a dict as well as a list of dicts.
@@ -180,16 +180,23 @@ func (w *WebHook) send(serviceID string) error {
 	}
 	defer resp.Body.Close()
 
-	// SUCCESS!
-	if resp.StatusCode == w.DesiredStatusCode || w.DesiredStatusCode == 0 {
+	// SUCCESS
+	if resp.StatusCode == w.DesiredStatusCode || (w.DesiredStatusCode == 0 && (strconv.Itoa(resp.StatusCode)[:1] == "2")) {
 		log.Printf("INFO: %s, WebHook received (%d)", serviceID, resp.StatusCode)
 		return nil
 	}
 
-	// FAIL!
+	// FAIL
 	body, _ := ioutil.ReadAll(resp.Body)
-	if *verbose {
-		log.Printf("ERROR: Request didn't respond with %d. Got a %s, %s", w.DesiredStatusCode, resp.Status, body)
+
+	// Pretty desiredStatusCode
+	desiredStatusCode := strconv.Itoa(w.DesiredStatusCode)
+	if desiredStatusCode == "0" {
+		desiredStatusCode = "2XX"
 	}
-	return fmt.Errorf("request didn't respond with %d: Got a %s, %s", w.DesiredStatusCode, resp.Status, body)
+
+	if *verbose {
+		log.Printf("ERROR: WebHook didn't respond with %s. Got a %s, %s", desiredStatusCode, resp.Status, body)
+	}
+	return fmt.Errorf("request didn't respond with %s: Got a %s, %s", desiredStatusCode, resp.Status, body)
 }
