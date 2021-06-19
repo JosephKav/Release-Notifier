@@ -8,6 +8,7 @@ import (
 	"io/ioutil"
 	"log"
 	"net/http"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -21,7 +22,7 @@ type Slack struct {
 	Message   string `yaml:"message"`    // "${monitor} - ${version} released"
 	Username  string `yaml:"username"`   // "Release Notifier"
 	IconEmoji string `yaml:"icon"`       // ":github:"
-	MaxTries  int    `yaml:"maxretries"` // Number of times to attempt sending the Slack message if a 200 is not received.
+	MaxTries  int    `yaml:"maxretries"` // Number of times to attempt sending the Slack message if a 2XX is not received.
 }
 
 // UnmarshalYAML allows handling of a dict as well as a list of dicts.
@@ -83,29 +84,31 @@ type SlackPayload struct {
 // send will send every slack message in this SlackSlice.
 func (s *SlackSlice) send(serviceID string, mon *Monitor) {
 	for index := range *s {
-		// Send each Slack message up to s.MaxRetries number of times until they 200
+		// Send each Slack message up to s.MaxTries number of times until they receive a 2XX
 		go func() {
 			index := index                    // Create new instance for the goroutine.
-			triesLeft := (*s)[index].MaxTries // Number of times to send WebHook (until 200 received).
+			triesLeft := (*s)[index].MaxTries // Number of times to send WebHook (until 2XX received).
 			for {
 				err := (*s)[index].send(serviceID, mon)
 
 				// SUCCESS
 				if err == nil {
-					break
+					return
 				}
 
 				// FAIL
 				triesLeft--
-				// Give up after MaxRetries
+
+				// Give up after MaxTries
 				if triesLeft == 0 {
 					// If not verbose (this would already have been printed in verbose)
 					if !*verbose {
 						log.Printf("ERROR: %s", err)
 					}
 					log.Printf("ERROR: %s, Failed %d times to send slack message to %s", serviceID, (*s)[index].MaxTries, (*s)[index].URL)
-					break
+					return
 				}
+
 				// Space out retries
 				time.Sleep(10 * time.Second)
 			}
@@ -155,8 +158,8 @@ func (s *Slack) send(serviceID string, mon *Monitor) error {
 	}
 	defer resp.Body.Close()
 
-	// SUCCESS
-	if resp.StatusCode == http.StatusOK {
+	// SUCCESS (2XX)
+	if strconv.Itoa(resp.StatusCode)[:1] == "2" {
 		log.Printf("INFO: %s, Slack message sent", serviceID)
 		return nil
 	}
@@ -164,8 +167,7 @@ func (s *Slack) send(serviceID string, mon *Monitor) error {
 	// FAIL
 	body, _ := ioutil.ReadAll(resp.Body)
 	if *verbose {
-		log.Printf("ERROR: Slack request didn't respond with 200 OK: %s, %s", resp.Status, body)
+		log.Printf("ERROR: Slack request didn't respond with 2XX OK: %s, %s", resp.Status, body)
 	}
-	return fmt.Errorf("Slack request didn't respond with 200 OK: %s, %s", resp.Status, body)
-
+	return fmt.Errorf("Slack request didn't respond with 2XX OK: %s, %s", resp.Status, body)
 }

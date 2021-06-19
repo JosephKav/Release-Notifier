@@ -119,7 +119,7 @@ defaults:
       message: '<${monitor_url}|${monitor_id}> - ${version} released'  # Optional. Formatting of the message to send.
       username: 'Release Notifier'                                     # Optional. The user to message as.
       icon_emoji: ':github:'                                           # Optional. The icon of that user.
-    maxtries: 3                                                        # Number of times to resend until 200 status code is received.
+    maxtries: 3                                                        # Number of times to resend until a 2XX status code is received.
 ```
 message - Each element of the monitor array can trigger a Slack message. This is the message that is sent when a change in version is noticed.
 - \$\{monitor\} will be replaced with the id given to the monitor element that has changed version and that text will link to the url of that monitor element.
