@@ -22,7 +22,7 @@ type Monitor struct {
 	URLCommands       URLCommandSlice `yaml:"url_commands"`  // Commands to filter the release from the URL request.
 	RegexContent      string          `yaml:"regex_content"` // "abc-[a-z]+-${version}_amd64.deb" This regex must exist in the body of the URL to trigger new version actions.
 	RegexVersion      string          `yaml:"regex_version"` // "v*[0-9.]+" The version found must match this release to trigger new version actions.
-	AllowInvalidCerts bool            `yaml:"allow_invalid"` // default - false = Disallows invalid HTTPS certificates.
+	AllowInvalidCerts string          `yaml:"allow_invalid"` // default - false = Disallows invalid HTTPS certificates.
 	AccessToken       string          `yaml:"access_token"`  // GitHub access token to use.
 	SkipSlack         bool            `yaml:"skip_slack"`    // default - false = Don't skip Slack messages for new releases.
 	SkipWebHook       bool            `yaml:"skip_webhook"`  // default - false = Don't skip WebHooks for new releases.
@@ -105,6 +105,20 @@ func (m *MonitorSlice) setDefaults(defaults Defaults) {
 
 // setDefaults sets the defaults for each undefined var using defaults.
 func (m *Monitor) setDefaults(defaults Defaults) {
+	// Default GitHub Access Token
+	if m.AccessToken == "" {
+		m.AccessToken = defaults.Monitor.AccessToken
+	}
+
+	// Default allowance/rejection of invalid certs
+	if m.AllowInvalidCerts == "" {
+		m.AllowInvalidCerts = defaults.Monitor.AllowInvalidCerts
+	} else if strings.ToLower(m.AllowInvalidCerts) == "true" || strings.ToLower(m.AllowInvalidCerts) == "yes" {
+		m.AllowInvalidCerts = "y"
+	} else {
+		m.AllowInvalidCerts = "n"
+	}
+
 	// Default ID if undefined/blank.
 	if m.ID == "" {
 		// Set m.ID to github "owner/repo".
@@ -141,6 +155,11 @@ func (m *Monitor) setDefaults(defaults Defaults) {
 		}
 	}
 
+	// Default Interval.
+	if m.Interval == 0 {
+		m.Interval = defaults.Monitor.Interval
+	}
+
 	// Default Type.
 	if m.Type == "" {
 		if strings.Count(m.URL, "/") == 1 {
@@ -164,15 +183,6 @@ func (m *Monitor) setDefaults(defaults Defaults) {
 			m.URL = strings.SplitN(m.URL, "/", 2)[1]
 			m.URL = fmt.Sprintf("https://api.github.com/repos/%s/releases/latest", m.URL)
 		}
-	}
-
-	if m.AccessToken == "" {
-		m.AccessToken = defaults.Monitor.AccessToken
-	}
-
-	// Default Interval.
-	if m.Interval == 0 {
-		m.Interval = defaults.Monitor.Interval
 	}
 }
 
@@ -203,7 +213,7 @@ func regexCheckContent(re string, text string, version string) bool {
 func (m *Monitor) query(i int) bool {
 	customTransport := &http.Transport{}
 	// HTTPS insecure skip verify.
-	if m.AllowInvalidCerts {
+	if m.AllowInvalidCerts == "y" {
 		customTransport = http.DefaultTransport.(*http.Transport).Clone()
 		customTransport.TLSClientConfig = &tls.Config{InsecureSkipVerify: true}
 	}
@@ -290,6 +300,9 @@ func (m *Monitor) query(i int) bool {
 					index = len(versions) + command.Index
 				}
 				version = versions[index]
+			default:
+				log.Printf("ERROR: %s, Unknown type in URL_Commands", m.ID)
+				return false
 			}
 		}
 	}

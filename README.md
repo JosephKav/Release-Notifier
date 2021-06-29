@@ -60,6 +60,7 @@ defaults:
   webhook:
     desired_status_code: 0
     maxtries: 3
+    silent_fails: false
 services:
   - id: CV-Site
     monitor:
@@ -102,13 +103,14 @@ defaults:
   webhook:
     desired_status_code: 0
     maxtries: 3
+    silent_fails: false
 ```
 
 ##### Defaults - Monitor
 ```yaml
 defaults:
   monitor:
-    interval: 600                      # Time between monitor queries.
+    interval: 600                        # Time between monitor queries.
     access_token: 'GITHUB_ACCESS_TOKEN'  # Increase API rate limit with an access token (and allow querying private repo's). Used when type="github".
 ```
 
@@ -185,7 +187,7 @@ services:
       url_commands:                                     # Optional. Used when type="url" as a list of commands to filter out the release from the URL content.
         - type: "regex", "replace" or "split"  # Required. Type of command to filter release with.
           regex: 'grafana\/tree\/v[0-9.]+"'    # Required if type="regex". Regex to split URL content on.
-          index: -1                            # Required if type="split". Take this index of the split data. (supports negative indices).
+          index: -1                            # Required if type = "regex" or "split". Take this index of the split data. (supports negative indices).
           old: "TEXT_TO_REPLACE"               # Required if type="replace". Replace this text.
           new: "REPLACE_WITH_THIS"             # Required if type="replace". Replace with this text.
           text: "ABC"                          # Required if type="split". Split on this text.
@@ -199,7 +201,7 @@ services:
 ```
 The values of the optional boolean arguments are the default values.
 
-regex_conent:
+regex_content:
 - \$\{version\} will be replaced with the version that was found (e.g. \$version = 10.6.3).
 - \$\{version_no_v\} will be replaced with the version that was found where any v's in the version are removed (e.g. \$version = v10.6.3 - \$version_no_v = 10.6.3).
 
@@ -240,5 +242,6 @@ message:
       secret: "SECRET"        # Required. The secret to send the WebHook with.
       desired_status_code: 0  # Optional. Keep sending the WebHooks until we recieve this status code (0 = accept any 2XX code).
       maxtries: 3             # Optional. Number of times to try re-sending WebHooks until we receive desired_status_code
+      silent_fails: false     # Optional. Whether to send Slack messages to the Slack's of the Monitor when a WebHook fails maxtries times.
 ```
 The values of the optional arguments are the default values.

@@ -44,13 +44,14 @@ type SlackDefaults struct {
 	IconEmoji string `yaml:"slack_icon_emoji"` // Icon emoji to use for the Slack message.
 	Username  string `yaml:"username"`         // Username to send the Slack message as.
 	Message   string `yaml:"message"`          // Slack message to send.
-	MaxTries  int    `yaml:"maxtries"`         // Number of times to attempt sending the Slack message if a 200 is not received.
+	MaxTries  int    `yaml:"maxtries"`         // Number of times to attempt sending the Slack message until a 200 is received.
 }
 
 // WebHookDefaults are the defaults for webhook.
 type WebHookDefaults struct {
-	DesiredStatusCode int `yaml:"desired_status_code"` // Re-send each WebHook until we get this status code. (0 = accept all)
-	MaxTries          int `yaml:"maxtries"`            // Number of times to attempt sending the WebHook if the desired status code is not received.
+	DesiredStatusCode int    `yaml:"desired_status_code"` // Re-send each WebHook until we get this status code. (0 = accept all 2** codes)
+	MaxTries          int    `yaml:"maxtries"`            // Number of times to attempt sending the WebHook if the desired status code is not received.
+	SilentFails       string `yaml:"silent_fails"`        // Whether to notify if a WebHook fails MaxTries times
 }
 
 // setDefaults will set the defaults for each undefined var.
@@ -80,6 +81,11 @@ func (d *Defaults) setDefaults() {
 	}
 	if d.WebHook.MaxTries == 0 {
 		d.WebHook.MaxTries = 3
+	}
+	if strings.ToLower(d.WebHook.SilentFails) == "true" {
+		d.WebHook.SilentFails = "y"
+	} else {
+		d.WebHook.SilentFails = "n"
 	}
 }
 

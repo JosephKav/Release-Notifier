@@ -48,12 +48,12 @@ func (s *Service) track(i int) {
 		if s.Monitor[i].query(i) {
 			if !s.Monitor[i].SkipSlack {
 				// Send the Slack Messages.
-				go s.Slack.send(s.ID, &s.Monitor[i])
+				go s.Slack.send(s.ID, &s.Monitor[i], "")
 			}
 
 			if !s.Monitor[i].SkipWebHook {
 				// Send the WebHooks.
-				go s.WebHook.send(s.ID)
+				go s.WebHook.send(s.ID, &s.Monitor[i], s.Slack)
 			}
 		}
 

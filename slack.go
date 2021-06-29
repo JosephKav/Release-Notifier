@@ -18,11 +18,11 @@ type SlackSlice []Slack
 
 // Slack is a Slack message w/ destination and from details.
 type Slack struct {
-	URL       string `yaml:"url"`        // "https://example.com
-	Message   string `yaml:"message"`    // "${monitor} - ${version} released"
-	Username  string `yaml:"username"`   // "Release Notifier"
-	IconEmoji string `yaml:"icon"`       // ":github:"
-	MaxTries  int    `yaml:"maxretries"` // Number of times to attempt sending the Slack message if a 2XX is not received.
+	URL       string `yaml:"url"`      // "https://example.com
+	Message   string `yaml:"message"`  // "${monitor} - ${version} released"
+	Username  string `yaml:"username"` // "Release Notifier"
+	IconEmoji string `yaml:"icon"`     // ":github:"
+	MaxTries  int    `yaml:"maxtries"` // Number of times to attempt sending the Slack message if a 200 is not received.
 }
 
 // UnmarshalYAML allows handling of a dict as well as a list of dicts.
@@ -82,19 +82,20 @@ type SlackPayload struct {
 }
 
 // send will send every slack message in this SlackSlice.
-func (s *SlackSlice) send(serviceID string, mon *Monitor) {
+func (s *SlackSlice) send(serviceID string, mon *Monitor, message string) {
 	for index := range *s {
-		// Send each Slack message up to s.MaxTries number of times until they receive a 2XX
+		// Send each Slack message up to s.MaxTries number of times until they 200
 		go func() {
 			index := index                    // Create new instance for the goroutine.
-			triesLeft := (*s)[index].MaxTries // Number of times to send WebHook (until 2XX received).
+			triesLeft := (*s)[index].MaxTries // Number of times to send WebHook (until 200 received).
 			for {
-				err := (*s)[index].send(serviceID, mon)
+				err := (*s)[index].send(serviceID, mon, message)
 
 				// SUCCESS
 				if err == nil {
 					return
 				}
+				log.Printf("ERROR: Sending Slack failed.\n%v", err)
 
 				// FAIL
 				triesLeft--
@@ -105,7 +106,7 @@ func (s *SlackSlice) send(serviceID string, mon *Monitor) {
 					if !*verbose {
 						log.Printf("ERROR: %s", err)
 					}
-					log.Printf("ERROR: %s, Failed %d times to send slack message to %s", serviceID, (*s)[index].MaxTries, (*s)[index].URL)
+					log.Printf("ERROR: %s, Failed %d times to send a slack message to %s", serviceID, (*s)[index].MaxTries, (*s)[index].URL)
 					return
 				}
 
@@ -119,24 +120,28 @@ func (s *SlackSlice) send(serviceID string, mon *Monitor) {
 }
 
 // send sends a formatted Slack notification regarding m.
-func (s *Slack) send(serviceID string, mon *Monitor) error {
-	payload := SlackPayload{
-		Username:  s.Username,
-		IconEmoji: s.IconEmoji,
-		Text:      s.Message,
-	}
+func (s *Slack) send(serviceID string, mon *Monitor, message string) error {
 	mURL := mon.URL
-
 	// GitHub monitor. Get the non-API URL.
 	if mon.Type == "github" {
 		mURL = strings.Split(mon.URL, "github.com/repos/")[1]
 		mURL = fmt.Sprintf("https://github.com/%s/%s", strings.Split(mURL, "/")[0], strings.Split(mURL, "/")[1])
 	}
 
-	payload.Text = strings.ReplaceAll(payload.Text, "${service}", serviceID)
-	payload.Text = strings.ReplaceAll(payload.Text, "${monitor_url}", mURL)
-	payload.Text = strings.ReplaceAll(payload.Text, "${monitor_id}", mon.ID)
-	payload.Text = strings.ReplaceAll(payload.Text, "${version}", mon.status.version)
+	// Use default new release Slack message (Not a custom message)
+	if message == "" {
+		message = s.Message
+		message = strings.ReplaceAll(message, "${service}", serviceID)
+		message = strings.ReplaceAll(message, "${monitor_url}", mURL)
+		message = strings.ReplaceAll(message, "${monitor_id}", mon.ID)
+		message = strings.ReplaceAll(message, "${version}", mon.status.version)
+	}
+
+	payload := SlackPayload{
+		Username:  s.Username,
+		IconEmoji: s.IconEmoji,
+		Text:      message,
+	}
 
 	payloadData, err := json.Marshal(payload)
 	if err != nil {
@@ -167,7 +172,7 @@ func (s *Slack) send(serviceID string, mon *Monitor) error {
 	// FAIL
 	body, _ := ioutil.ReadAll(resp.Body)
 	if *verbose {
-		log.Printf("ERROR: Slack request didn't respond with 2XX OK: %s, %s", resp.Status, body)
+		log.Printf("ERROR: Slack request didn't 2XX:\n%s\n%s", resp.Status, body)
 	}
-	return fmt.Errorf("Slack request didn't respond with 2XX OK: %s, %s", resp.Status, body)
+	return fmt.Errorf("%s. %s", resp.Status, body)
 }

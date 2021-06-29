@@ -14,6 +14,7 @@ import (
 	"math/rand"
 	"net/http"
 	"strconv"
+	"strings"
 	"time"
 )
 
@@ -26,7 +27,8 @@ type WebHook struct {
 	URL               string `yaml:"url"`                 // "https://example.com"
 	Secret            string `yaml:"secret"`              // "SECRET"
 	DesiredStatusCode int    `yaml:"desired_status_code"` // e.g. 202
-	MaxTries          int    `yaml:"maxtries"`            // Number of times to send the WebHook if desired_status_code is not received.
+	MaxTries          int    `yaml:"maxtries"`            // Number of times to attempt sending the WebHook if the desired status code is not received.
+	SilentFails       string `yaml:"silent_fails"`        // Whether to notify if this WebHook fails MaxTries times
 }
 
 // UnmarshalYAML allows handling of a dict as well as a list of dicts.
@@ -68,6 +70,14 @@ func (w *WebHook) setDefaults(defaults Defaults) {
 	if w.MaxTries == 0 {
 		w.MaxTries = defaults.WebHook.MaxTries
 	}
+
+	if w.SilentFails == "" {
+		w.SilentFails = defaults.WebHook.SilentFails
+	} else if strings.ToLower(w.SilentFails) == "true" || strings.ToLower(w.SilentFails) == "yes" {
+		w.SilentFails = "y"
+	} else {
+		w.SilentFails = "n"
+	}
 }
 
 // WebHookGitHub is the WebHook payload to emulate GitHub.
@@ -77,32 +87,31 @@ type WebHookGitHub struct {
 	After  string `json:"after"`  // "randAlphaNumericLower(40)"
 }
 
+// randString will make a random string of length n with alphabet.
+func randString(n int, alphabet string) string {
+	b := make([]byte, n)
+	for i := range b {
+		b[i] = alphabet[rand.Intn(len(alphabet))]
+	}
+	return string(b)
+}
+
 const numeric = "0123456789"
 
 // randNumeric will return a random numeric string of length n.
 func randNumeric(n int) string {
-	rand.Seed(time.Now().UnixNano())
-	b := make([]byte, n)
-	for i := range b {
-		b[i] = numeric[rand.Intn(len(numeric))]
-	}
-	return string(b)
+	return randString(n, numeric)
 }
 
 const alphanumericLower = "abcdefghijklmnopqrstuvwxyz0123456789"
 
 // randAlphaNumericLower will return a random alphanumeric (lowercase) string of length n.
 func randAlphaNumericLower(n int) string {
-	rand.Seed(time.Now().UnixNano())
-	b := make([]byte, n)
-	for i := range b {
-		b[i] = alphanumericLower[rand.Intn(len(alphanumericLower))]
-	}
-	return string(b)
+	return randString(n, alphanumericLower)
 }
 
 // send will send every WebHook in this WebHookSlice with a delay between each webhook.
-func (w *WebHookSlice) send(serviceID string) {
+func (w *WebHookSlice) send(serviceID string, mon *Monitor, slacks SlackSlice) {
 	for index := range *w {
 		go func() {
 			index := index                    // Create new instance for the goroutine.
@@ -123,14 +132,18 @@ func (w *WebHookSlice) send(serviceID string) {
 					if !*verbose {
 						log.Printf("ERROR: %s", err)
 					}
-					log.Printf("ERROR: %s, Failed %d times to send webhook to %s", serviceID, (*w)[index].MaxTries, (*w)[index].URL)
+					message := fmt.Sprintf("%s, Failed %d times to send a WebHook to %s", serviceID, (*w)[index].MaxTries, (*w)[index].URL)
+					if (*w)[index].SilentFails == "n" {
+						slacks.send(serviceID, mon, message)
+					}
+					log.Printf("ERROR: %s", message)
 					break
 				}
 				// Space out retries.
 				time.Sleep(10 * time.Second)
 			}
 		}()
-		// Space out Slack messages.
+		// Space out WebHooks.
 		time.Sleep(3 * time.Second)
 	}
 }
@@ -182,7 +195,7 @@ func (w *WebHook) send(serviceID string) error {
 
 	// SUCCESS
 	if resp.StatusCode == w.DesiredStatusCode || (w.DesiredStatusCode == 0 && (strconv.Itoa(resp.StatusCode)[:1] == "2")) {
-		log.Printf("INFO: %s, WebHook received (%d)", serviceID, resp.StatusCode)
+		log.Printf("INFO: %s, (%d) WebHook received", serviceID, resp.StatusCode)
 		return nil
 	}
 
@@ -196,7 +209,7 @@ func (w *WebHook) send(serviceID string) error {
 	}
 
 	if *verbose {
-		log.Printf("ERROR: WebHook didn't respond with %s. Got a %s, %s", desiredStatusCode, resp.Status, body)
+		log.Printf("ERROR: WebHook didn't %s:\n%s\n%s", desiredStatusCode, resp.Status, body)
 	}
-	return fmt.Errorf("request didn't respond with %s: Got a %s, %s", desiredStatusCode, resp.Status, body)
+	return fmt.Errorf("%s", resp.Status)
 }
