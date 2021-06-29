@@ -52,6 +52,7 @@ defaults:
   monitor:
     interval: 600
     access_token: 'GITHUB_ACCESS_TOKEN'
+    allow_invalid: false
   slack:
     message: '<${monitor_url}|${monitor_id}> - ${version} released'
     username: 'Release Notifier'
@@ -84,7 +85,7 @@ services:
     slack:
       url: https://SLACK_INCOMING_WEBHOOK
 ```
- Above, I set defaults.monitor.interval to 600 and then don't define an interval for the golang/go monitor. Therefore, this monitor will follow defaults.monitor.interval and query the site every 600 seconds. But, I can override that interval by stating it, for example in the adnanh/webhook monitor, I have set interval to 300 and so that page will be queried every 300 seconds.
+Above, I set defaults.monitor.interval to 600 and then don't define an interval for the golang/go monitor. Therefore, this monitor will follow defaults.monitor.interval and query the site every 600 seconds. But, I can override that interval by stating it, for example in the adnanh/webhook monitor, I have set interval to 300 and so that page will be queried every 300 seconds.
 
 #### Defaults
 Defaults are not needed in the config, but you can override the coded defaults with your own defaults for Monitors, WebHooks and Slack messages in this defaults section. In the examples below, the values set are the coded defaults that will be used if they haven't been included in the service being monitored or the config defaults. (excluding access_token)
@@ -95,6 +96,7 @@ defaults:
   monitor:
     interval: 600
     access_token: 'GITHUB_ACCESS_TOKEN'
+    allow_invalid: false
   slack:
     message: '<${monitor_url}|${monitor_id}> - ${version} released'
     username: 'Release Notifier'
@@ -112,21 +114,22 @@ defaults:
   monitor:
     interval: 600                        # Time between monitor queries.
     access_token: 'GITHUB_ACCESS_TOKEN'  # Increase API rate limit with an access token (and allow querying private repo's). Used when type="github".
+    allow_invalid: false                 # Allow invalid HTTPS Certificates.
 ```
 
 ##### Defaults - Slack
 ```yaml
 defaults:
   slack:
-      message: '<${monitor_url}|${monitor_id}> - ${version} released'  # Optional. Formatting of the message to send.
-      username: 'Release Notifier'                                     # Optional. The user to message as.
-      icon_emoji: ':github:'                                           # Optional. The icon of that user.
+    message: '<${monitor_url}|${monitor_id}> - ${version} released'  # Optional. Formatting of the message to send.
+    username: 'Release Notifier'                                     # Optional. The user to message as.
+    icon_emoji: ':github:'                                           # Optional. The icon of that user.
     maxtries: 3                                                        # Number of times to resend until a 2XX status code is received.
 ```
 message - Each element of the monitor array can trigger a Slack message. This is the message that is sent when a change in version is noticed.
-- \$\{monitor\} will be replaced with the id given to the monitor element that has changed version and that text will link to the url of that monitor element.
-- \$\{version\} will be replaced with the version that was found (e.g. 10.6.3).
-- \$\{service\} will be replaced with the id of the monitor element triggering the message.
+- `${monitor}` will be replaced with the id given to the monitor element that has changed version and that text will link to the url of that monitor element.
+- `${version}` will be replaced with the version that was found (e.g. `${version} = 10.6.3`).
+- `${service}` will be replaced with the id of the monitor element triggering the message.
 
 ##### Defaults - WebHook
 ```yaml
@@ -182,15 +185,15 @@ services:
   - id: "PRETTY_SERVICE_NAME"  # Optional. Replaces ${service} in Slack messages.
     monitor:                   # Required.
       id: "PRETTY NAME"                                 # Optional. Used in logs/Slack messages.
-      type: "github" or "url"                           # Optional. If unset, ill be set to github if only one / is present, otherwise url.
-      url: GITHUB_OWNER/REPO                            # Required. URL/Repo to monitor. "OWNER/REPO" if type="github", or "URL_TO_MONITOR" when type="url"
+      type: "github"|"url"                              # Optional. If unset, ill be set to github if only one / is present, otherwise url.
+      url: GITHUB_OWNER/REPO                            # Required. URL/Repo to monitor. "OWNER/REPO" if type="github" | "URL_TO_MONITOR" if type="url"
       url_commands:                                     # Optional. Used when type="url" as a list of commands to filter out the release from the URL content.
-        - type: "regex", "replace" or "split"  # Required. Type of command to filter release with.
-          regex: 'grafana\/tree\/v[0-9.]+"'    # Required if type="regex". Regex to split URL content on.
-          index: -1                            # Required if type = "regex" or "split". Take this index of the split data. (supports negative indices).
-          old: "TEXT_TO_REPLACE"               # Required if type="replace". Replace this text.
-          new: "REPLACE_WITH_THIS"             # Required if type="replace". Replace with this text.
-          text: "ABC"                          # Required if type="split". Split on this text.
+        - type: "regex"|"regex_submatch"|"replace"|"split"  # Required. Type of command to filter release with.
+          regex: 'grafana\/tree\/v[0-9.]+"'                 # Required if type=("regex"|"regex_submatch"). Regex to split URL content on.
+          index: -1                                         # Required if type=("regex"|"regex_submatch"|"split"). Take this index of the split data. (supports negative indices).
+          old: "TEXT_TO_REPLACE"                            # Required if type="replace". Replace this text.
+          new: "REPLACE_WITH_THIS"                          # Required if type="replace". Replace with this text.
+          text: "ABC"                                       # Required if type="split". Split on this text.
       regex_content: "abc-[a-z]+-${version}_amd64.deb"  # Optional. This regex must exist on the URL content to be classed as a new release.
       regex_version: '^v[0-9.]+$'                       # Optional. The version found must contain matching regex to be classed as a new release.
       allow_invalid: false                              # Optional. Allow invalid HTTPS Certificates.
@@ -202,12 +205,23 @@ services:
 The values of the optional boolean arguments are the default values.
 
 regex_content:
-- \$\{version\} will be replaced with the version that was found (e.g. \$version = 10.6.3).
-- \$\{version_no_v\} will be replaced with the version that was found where any v's in the version are removed (e.g. \$version = v10.6.3 - \$version_no_v = 10.6.3).
+- `${version}` will be replaced with the version that was found (e.g. `${version} = 10.6.3`).
+- `${version_no_v}` will be replaced with the version that was found where any v's in the version are removed (e.g. `${version} = v10.6.3` - `${version_no_v} = 10.6.3`).
 
 regex_version:
-- Remember ^ indicates the start of the version. A regex of 'v[0-9.]' would find a match on betav0.5. Adding the ^ at the start would mean that version doesn't match the regex.
-- Remember \$ indicates the end of the version. A regex of 'v[0-9.]' would find a match on v0.5-beta. Adding the $ at the end would mean that version doesn't match the regex.
+- Remember `^` indicates the start of the string. A regex of `v[0-9.]` would find a match on `betav0.5`. Adding the `^` at the start would mean that version doesn't match the regex.
+- Remember `$` indicates the end of the string. A regex of `v[0-9.]` would find a match on `v0.5-beta`. Adding the `$` at the end would mean that version doesn't match the regex.
+
+url_commands:
+- type:
+  - regex:
+    - This allows you to extract the version with regex. The whole regex match will be returned as the version. This needs an `index` to define which match to return (e.g. `-1` would be the last match).
+  - regex_submatch:
+    - This uses a `regex` such as `Proxmox VE ([0-9.]+) ISO Installer`. When used on a URL with `Proxmox VE 6.4 ISO Installer` in the content, with an `index` of `1`, the match in the brackets will be returned(`6.4` in this case).
+  - split:
+    - This will split the string on `text` and use the element at `index`.
+  - replace:
+    - This will replace `old` with `new` in the URL content at this point.
 
 ##### Services - Slack
 ```yaml
@@ -225,9 +239,9 @@ services:
 The values of the optional arguments are the default values.
 
 message:
-- \$\{monitor\} will be replaced with the id given to the monitor element that has changed version and that text will link to the url of that monitor element.
-- \$\{version\} will be replaced with the version that was found (e.g. 10.6.3).
-- \$\{service\} will be replaced with the id of the monitor element triggering the message.
+- `${monitor}` will be replaced with the id given to the monitor element that has changed version and that text will link to the url of that monitor element.
+- `${version}` will be replaced with the version that was found (e.g. `${version} = 10.6.3`).
+- `${service}` will be replaced with the id of the monitor element triggering the message.
 
 (of the monitor element that is triggering the message)
 

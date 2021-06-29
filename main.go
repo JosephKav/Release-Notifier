@@ -35,8 +35,9 @@ type Defaults struct {
 
 // MonitorDefaults are the defaults for Monitor.
 type MonitorDefaults struct {
-	AccessToken string `yaml:"access_token"` // GitHub access token.
-	Interval    int    `yaml:"interval"`     // Interval (in seconds) between each version check.
+	AccessToken       string `yaml:"access_token"`  // GitHub access token.
+	AllowInvalidCerts string `yaml:"allow_invalid"` // default - false = Disallows invalid HTTPS certificates.
+	Interval          int    `yaml:"interval"`      // Interval (in seconds) between each version check.
 }
 
 // SlackDefaults are the defaults for Slack.
@@ -57,6 +58,11 @@ type WebHookDefaults struct {
 // setDefaults will set the defaults for each undefined var.
 func (d *Defaults) setDefaults() {
 	// MonitorDefaults defaults.
+	if strings.ToLower(d.Monitor.AllowInvalidCerts) == "true" || strings.ToLower(d.Monitor.AllowInvalidCerts) == "yes" {
+		d.Monitor.AllowInvalidCerts = "y"
+	} else {
+		d.Monitor.AllowInvalidCerts = "n"
+	}
 	if d.Monitor.Interval == 0 {
 		d.Monitor.Interval = 600
 	}

@@ -272,9 +272,8 @@ func (m *Monitor) query(i int) bool {
 			case "split":
 				versions := strings.Split(version, command.Text)
 
-				if len(versions) == 0 {
-					log.Printf("WARN: Split on URL content for %s didn't return any matches", m.ID)
-					return false
+				if len(versions) == 1 {
+					log.Printf("WARNING: %s, %s didn't find any '%s' to split on", m.ID, command.Type, command.Text)
 				}
 
 				index := command.Index
@@ -282,16 +281,31 @@ func (m *Monitor) query(i int) bool {
 				if index < 0 {
 					index = len(versions) + index
 				}
+
+				if (len(versions) - index) < 1 {
+					log.Printf("WARNING: %s, %s returned %d elements but the index wants element number %d", m.ID, command.Type, len(versions), (index + 1))
+					continue
+				}
+
 				version = versions[index]
 			case "replace":
 				version = strings.ReplaceAll(version, command.Old, command.New)
-			case "regex":
+			case "regex", "regex_submatch":
 				re := regexp.MustCompile(command.Regex)
-				versions := re.FindAllString(version, -1)
+
+				var versions []string
+				if command.Type == "regex" {
+					versions = re.FindAllString(version, -1)
+				} else if command.Type == "regex_submatch" {
+					if command.Index < 0 {
+						log.Printf("WARNING: %s, %s shouldn't use negative indices as the array is always made up from the first match.", m.ID, command.Type)
+					}
+					versions = re.FindStringSubmatch(version)
+				}
 
 				if len(versions) == 0 {
-					log.Printf("INFO: Regex on URL content for %s didn't return any matches", m.ID)
-					return false
+					log.Printf("INFO: %s, %s didn't return any matches", m.ID, command.Type)
+					continue
 				}
 
 				index := command.Index
@@ -299,10 +313,16 @@ func (m *Monitor) query(i int) bool {
 				if command.Index < 0 {
 					index = len(versions) + command.Index
 				}
+
+				if (len(versions) - index) < 1 {
+					log.Printf("WARNING: %s, %s returned %d elements but the index wants element number %d", m.ID, command.Type, len(versions), (index + 1))
+					continue
+				}
+
 				version = versions[index]
 			default:
-				log.Printf("ERROR: %s, Unknown type in URL_Commands", m.ID)
-				return false
+				log.Printf("ERROR: %s, %s is an unknown type for URL_Commands", m.ID, command.Type)
+				continue
 			}
 		}
 	}
