@@ -42,10 +42,11 @@ type MonitorDefaults struct {
 
 // SlackDefaults are the defaults for Slack.
 type SlackDefaults struct {
-	IconEmoji string `yaml:"slack_icon_emoji"` // Icon emoji to use for the Slack message.
-	Username  string `yaml:"username"`         // Username to send the Slack message as.
-	Message   string `yaml:"message"`          // Slack message to send.
-	MaxTries  int    `yaml:"maxtries"`         // Number of times to attempt sending the Slack message until a 200 is received.
+	IconEmoji string `yaml:"icon_emoji"` // Icon emoji to use for the Slack message.
+	IconURL   string `yaml:"icon_url"`   // Icon URL to use for the Slack message.
+	Username  string `yaml:"username"`   // Username to send the Slack message as.
+	Message   string `yaml:"message"`    // Slack message to send.
+	MaxTries  int    `yaml:"maxtries"`   // Number of times to attempt sending the Slack message until a 200 is received.
 }
 
 // WebHookDefaults are the defaults for webhook.
@@ -74,7 +75,7 @@ func (d *Defaults) setDefaults() {
 	if d.Slack.Username == "" {
 		d.Slack.Username = "Release Notifier"
 	}
-	if d.Slack.IconEmoji == "" {
+	if d.Slack.IconEmoji == "" && d.Slack.IconURL == "" {
 		d.Slack.IconEmoji = ":github:"
 	}
 	if d.Slack.MaxTries == 0 {

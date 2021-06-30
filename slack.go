@@ -18,11 +18,12 @@ type SlackSlice []Slack
 
 // Slack is a Slack message w/ destination and from details.
 type Slack struct {
-	URL       string `yaml:"url"`      // "https://example.com
-	Message   string `yaml:"message"`  // "${monitor} - ${version} released"
-	Username  string `yaml:"username"` // "Release Notifier"
-	IconEmoji string `yaml:"icon"`     // ":github:"
-	MaxTries  int    `yaml:"maxtries"` // Number of times to attempt sending the Slack message if a 200 is not received.
+	URL       string `yaml:"url"`        // "https://example.com
+	Message   string `yaml:"message"`    // "${monitor} - ${version} released"
+	Username  string `yaml:"username"`   // "Release Notifier"
+	IconEmoji string `yaml:"icon_emoji"` // ":github:"
+	IconURL   string `yaml:"icon_url"`   // "https://github.githubassets.com/images/modules/logos_page/GitHub-Mark.png"
+	MaxTries  int    `yaml:"maxtries"`   // Number of times to attempt sending the Slack message if a 200 is not received.
 }
 
 // UnmarshalYAML allows handling of a dict as well as a list of dicts.
@@ -65,8 +66,9 @@ func (s *Slack) setDefaults(defaults Defaults) {
 		s.Username = defaults.Slack.Username
 	}
 
-	if s.IconEmoji == "" {
+	if s.IconEmoji == "" && s.IconURL == "" {
 		s.IconEmoji = defaults.Slack.IconEmoji
+		s.IconURL = defaults.Slack.IconURL
 	}
 
 	if s.MaxTries == 0 {
@@ -78,6 +80,7 @@ func (s *Slack) setDefaults(defaults Defaults) {
 type SlackPayload struct {
 	Username  string `json:"username"`   // "Release Notifier"
 	IconEmoji string `json:"icon_emoji"` // ":github:"
+	IconURL   string `json:"icon_url"`   // "https://github.githubassets.com/images/modules/logos_page/GitHub-Mark.png"
 	Text      string `json:"text"`       // "${monitor} - ${version} released"
 }
 
@@ -140,6 +143,7 @@ func (s *Slack) send(serviceID string, mon *Monitor, message string) error {
 	payload := SlackPayload{
 		Username:  s.Username,
 		IconEmoji: s.IconEmoji,
+		IconURL:   s.IconURL,
 		Text:      message,
 	}
 

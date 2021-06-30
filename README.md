@@ -56,7 +56,7 @@ defaults:
   slack:
     message: '<${monitor_url}|${monitor_id}> - ${version} released'
     username: 'Release Notifier'
-    icon_emoji: ':github:'
+    icon_url: 'https://github.githubassets.com/images/modules/logos_page/GitHub-Mark.png'
     maxtries: 3
   webhook:
     desired_status_code: 0
@@ -88,7 +88,7 @@ services:
 Above, I set defaults.monitor.interval to 600 and then don't define an interval for the golang/go monitor. Therefore, this monitor will follow defaults.monitor.interval and query the site every 600 seconds. But, I can override that interval by stating it, for example in the adnanh/webhook monitor, I have set interval to 300 and so that page will be queried every 300 seconds.
 
 #### Defaults
-Defaults are not needed in the config, but you can override the coded defaults with your own defaults for Monitors, WebHooks and Slack messages in this defaults section. In the examples below, the values set are the coded defaults that will be used if they haven't been included in the service being monitored or the config defaults. (excluding access_token)
+Defaults are not needed in the config, but you can override the coded defaults with your own defaults for Monitors, WebHooks and Slack messages in this defaults section. You could for example have a tiny defaults section that only has `defaults -> slack -> username: 'USERNAME'`, you do not need to define all values for a section. In the examples below, the values set are the coded defaults that will be used if they haven't been included in the service being monitored or the config defaults. (excluding access_token)
 
 ##### Example
 ```yaml
@@ -101,6 +101,7 @@ defaults:
     message: '<${monitor_url}|${monitor_id}> - ${version} released'
     username: 'Release Notifier'
     icon_emoji: ':github:'
+    icon_url: ''
     maxtries: 3
   webhook:
     desired_status_code: 0
@@ -123,7 +124,8 @@ defaults:
   slack:
     message: '<${monitor_url}|${monitor_id}> - ${version} released'  # Optional. Formatting of the message to send.
     username: 'Release Notifier'                                     # Optional. The user to message as.
-    icon_emoji: ':github:'                                           # Optional. The icon of that user.
+    icon_emoji: ':github:'                                           # Optional. The emoji icon for that user.
+    icon_url: ''                                                     # Optional. The URL of an icon for that user.
     maxtries: 3                                                        # Number of times to resend until a 2XX status code is received.
 ```
 message - Each element of the monitor array can trigger a Slack message. This is the message that is sent when a change in version is noticed.
@@ -233,7 +235,8 @@ services:
       url: "SLACK_INCOMING_WEBHOOK"                                    # Required. The URL of the incoming Slack WebHook to send the message to.
       message: '<${monitor_url}|${monitor_id}> - ${version} released'  # Optional. Formatting of the message to send.
       username: 'Release Notifier'                                     # Optional. The user to message as.
-      icon_emoji: ':github:'                                           # Optional. The icon of that user.
+      icon_emoji: ':github:'                                           # Optional. The emoji icon for that user.
+      icon_url: ''                                                     # Optional. The URL of an icon for that user.
       maxtries: 3                                                      # Optional. The number of times to resend until a 2XX status code is received.
 ```
 The values of the optional arguments are the default values.
