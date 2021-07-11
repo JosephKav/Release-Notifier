@@ -13,7 +13,7 @@ import (
 	"time"
 )
 
-// SlackSlice is an array of Slack's.
+// SlackSlice is an array of Slack.
 type SlackSlice []Slack
 
 // Slack is a Slack message w/ destination and from details.

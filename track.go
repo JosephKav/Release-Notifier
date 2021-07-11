@@ -6,7 +6,7 @@ import (
 	"time"
 )
 
-// ServiceSlice is an array of Service's.
+// ServiceSlice is an array of Service.
 type ServiceSlice []Service
 
 // Service is a service to monitor along with the actions to take

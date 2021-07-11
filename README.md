@@ -53,6 +53,7 @@ defaults:
     interval: 600
     access_token: 'GITHUB_ACCESS_TOKEN'
     allow_invalid: false
+    ignore_misses: false
   slack:
     message: '<${monitor_url}|${monitor_id}> - ${version} released'
     username: 'Release Notifier'
@@ -113,20 +114,21 @@ defaults:
 ```yaml
 defaults:
   monitor:
-    interval: 600                        # Time between monitor queries.
-    access_token: 'GITHUB_ACCESS_TOKEN'  # Increase API rate limit with an access token (and allow querying private repo's). Used when type="github".
-    allow_invalid: false                 # Allow invalid HTTPS Certificates.
+    interval: 600                       # Time between monitor queries.
+    access_token: 'GITHUB_ACCESS_TOKEN' # Increase API rate limit with an access token (and allow querying private repos). Used when type="github".
+    allow_invalid: false                # Allow invalid HTTPS Certificates.
+    ignore_misses: false                # Ignore url_command fails (e.g. split on text that doesn't exist)
 ```
 
 ##### Defaults - Slack
 ```yaml
 defaults:
   slack:
-    message: '<${monitor_url}|${monitor_id}> - ${version} released'  # Optional. Formatting of the message to send.
-    username: 'Release Notifier'                                     # Optional. The user to message as.
-    icon_emoji: ':github:'                                           # Optional. The emoji icon for that user.
-    icon_url: ''                                                     # Optional. The URL of an icon for that user.
-    maxtries: 3                                                        # Number of times to resend until a 2XX status code is received.
+    message: '<${monitor_url}|${monitor_id}> - ${version} released' # Formatting of the message to send.
+    username: 'Release Notifier'                                    # The user to message as.
+    icon_emoji: ':github:'                                          # The emoji icon for that user.
+    icon_url: ''                                                    # The URL of an icon for that user.
+    maxtries: 3                                                     # Number of times to resend until a 2XX status code is received.
 ```
 message - Each element of the monitor array can trigger a Slack message. This is the message that is sent when a change in version is noticed.
 - `${monitor}` will be replaced with the id given to the monitor element that has changed version and that text will link to the url of that monitor element.
@@ -137,8 +139,9 @@ message - Each element of the monitor array can trigger a Slack message. This is
 ```yaml
 defaults:
   webhook:
-    desired_status_code: 0  # Status code indicating a success. Send maxtries # of times until we receive this. 0 = accept any 2XX code.
-    maxtries: 3             # Number of times to resend until desired_status_code is received.
+    desired_status_code: 0 # Status code indicating a success. Send maxtries # of times until we receive this. 0 = accept any 2XX code.
+    maxtries: 3            # Number of times to resend until desired_status_code is received.
+    silent_fails: false    # Whether to notify Slack if a webhook fails maxtries times
 ```
 
 #### Services
@@ -184,25 +187,26 @@ This program can monitor multiple services. Just provide them in the standard ya
 ##### Services - Monitor
 ```yaml
 services:
-  - id: "PRETTY_SERVICE_NAME"  # Optional. Replaces ${service} in Slack messages.
-    monitor:                   # Required.
-      id: "PRETTY NAME"                                 # Optional. Used in logs/Slack messages.
-      type: "github"|"url"                              # Optional. If unset, ill be set to github if only one / is present, otherwise url.
-      url: GITHUB_OWNER/REPO                            # Required. URL/Repo to monitor. "OWNER/REPO" if type="github" | "URL_TO_MONITOR" if type="url"
-      url_commands:                                     # Optional. Used when type="url" as a list of commands to filter out the release from the URL content.
-        - type: "regex"|"regex_submatch"|"replace"|"split"  # Required. Type of command to filter release with.
-          regex: 'grafana\/tree\/v[0-9.]+"'                 # Required if type=("regex"|"regex_submatch"). Regex to split URL content on.
-          index: -1                                         # Required if type=("regex"|"regex_submatch"|"split"). Take this index of the split data. (supports negative indices).
-          old: "TEXT_TO_REPLACE"                            # Required if type="replace". Replace this text.
-          new: "REPLACE_WITH_THIS"                          # Required if type="replace". Replace with this text.
-          text: "ABC"                                       # Required if type="split". Split on this text.
-      regex_content: "abc-[a-z]+-${version}_amd64.deb"  # Optional. This regex must exist on the URL content to be classed as a new release.
-      regex_version: '^v[0-9.]+$'                       # Optional. The version found must contain matching regex to be classed as a new release.
-      allow_invalid: false                              # Optional. Allow invalid HTTPS Certificates.
-      access_token: 'GITHUB_ACCESS_TOKEN'               # Optional. GitHub access token to use. Allows smaller interval (higher API rate limit).
-      skip_slack: false                                 # Optional. Don't send Slack messages for new releases of this monitor.
-      skip_webhook: false                               # Optional. Don't send WebHooks for new releases of this monitor.
-      interval: 600                                     # Optional. Amount of seconds to sleep between querying the URL for the version.
+  - id: "PRETTY_SERVICE_NAME" # Optional. Replaces ${service} in Slack messages.
+    monitor:                  # Required.
+      id: "PRETTY NAME"                                # Optional. Used in logs/Slack messages.
+      type: "github"|"url"                             # Optional. If unset, ill be set to github if only one / is present, otherwise url.
+      url: GITHUB_OWNER/REPO                           # Required. URL/Repo to monitor. "OWNER/REPO" if type="github" | "URL_TO_MONITOR" if type="url"
+      url_commands:                                    # Optional. Used when type="url" as a list of commands to filter out the release from the URL content.
+        - type: "regex"|"regex_submatch"|"replace"|"split" # Required. Type of command to filter release with.
+          regex: 'grafana\/tree\/v[0-9.]+"'                # Required if type=("regex"|"regex_submatch"). Regex to split URL content on.
+          index: -1                                        # Required if type=("regex"|"regex_submatch"|"split"). Take this index of the split data. (supports negative indices).
+          old: "TEXT_TO_REPLACE"                           # Required if type="replace". Replace this text.
+          new: "REPLACE_WITH_THIS"                         # Required if type="replace". Replace with this text.
+          text: "ABC"                                      # Required if type="split". Split on this text.
+          ignore_misses: false                             # Optional. Ignore fails (e.g. split on text that doesn't exist or no regex match)
+      regex_content: "abc-[a-z]+-${version}_amd64.deb" # Optional. This regex must exist on the URL content to be classed as a new release.
+      regex_version: '^v[0-9.]+$'                      # Optional. The version found must contain matching regex to be classed as a new release.
+      allow_invalid: false                             # Optional. Allow invalid HTTPS Certificates.
+      access_token: 'GITHUB_ACCESS_TOKEN'              # Optional. GitHub access token to use. Allows smaller interval (higher API rate limit).
+      skip_slack: false                                # Optional. Don't send Slack messages for new releases of this monitor.
+      skip_webhook: false                              # Optional. Don't send WebHooks for new releases of this monitor.
+      interval: 600                                    # Optional. Amount of seconds to sleep between querying the URL for the version.
 ```
 The values of the optional boolean arguments are the default values.
 
@@ -228,16 +232,16 @@ url_commands:
 ##### Services - Slack
 ```yaml
 services:
-  - id: "PRETTY_SERVICE_NAME"  # Optional. Replaces ${service} in Slack messages.
-    monitor:                   # Required.
+  - id: "PRETTY_SERVICE_NAME" # Optional. Replaces ${service} in Slack messages.
+    monitor:                  # Required.
       ....
-    slack:                     # Optional.
-      url: "SLACK_INCOMING_WEBHOOK"                                    # Required. The URL of the incoming Slack WebHook to send the message to.
-      message: '<${monitor_url}|${monitor_id}> - ${version} released'  # Optional. Formatting of the message to send.
-      username: 'Release Notifier'                                     # Optional. The user to message as.
-      icon_emoji: ':github:'                                           # Optional. The emoji icon for that user.
-      icon_url: ''                                                     # Optional. The URL of an icon for that user.
-      maxtries: 3                                                      # Optional. The number of times to resend until a 2XX status code is received.
+    slack:                    # Optional.
+      url: "SLACK_INCOMING_WEBHOOK"                                   # Required. The URL of the incoming Slack WebHook to send the message to.
+      message: '<${monitor_url}|${monitor_id}> - ${version} released' # Optional. Formatting of the message to send.
+      username: 'Release Notifier'                                    # Optional. The user to message as.
+      icon_emoji: ':github:'                                          # Optional. The emoji icon for that user.
+      icon_url: ''                                                    # Optional. The URL of an icon for that user.
+      maxtries: 3                                                     # Optional. The number of times to resend until a 2XX status code is received.
 ```
 The values of the optional arguments are the default values.
 
@@ -250,15 +254,15 @@ message:
 
 ##### Services - WebHook
 ```yaml
-  - id: "PRETTY_SERVICE_NAME"  # Optional. Replaces ${service} in Slack messages.
-    monitor:                   # Required.
+  - id: "PRETTY_SERVICE_NAME" # Optional. Replaces ${service} in Slack messages.
+    monitor:                  # Required.
       ...
-    webhook:                   # Optional.
-      type: "github"          # Required. The type of WebHook to send (Currently only github is supported).
-      url: "WEBHOOK_URL"      # Required. The URL to send the WebHook to.
-      secret: "SECRET"        # Required. The secret to send the WebHook with.
-      desired_status_code: 0  # Optional. Keep sending the WebHooks until we recieve this status code (0 = accept any 2XX code).
-      maxtries: 3             # Optional. Number of times to try re-sending WebHooks until we receive desired_status_code
-      silent_fails: false     # Optional. Whether to send Slack messages to the Slack's of the Monitor when a WebHook fails maxtries times.
+    webhook:                  # Optional.
+      type: "github"         # Required. The type of WebHook to send (Currently only github is supported).
+      url: "WEBHOOK_URL"     # Required. The URL to send the WebHook to.
+      secret: "SECRET"       # Required. The secret to send the WebHook with.
+      desired_status_code: 0 # Optional. Keep sending the WebHooks until we recieve this status code (0 = accept any 2XX code).
+      maxtries: 3            # Optional. Number of times to try re-sending WebHooks until we receive desired_status_code
+      silent_fails: false    # Optional. Whether to send Slack messages to the Slacks of the Monitor when a WebHook fails maxtries times.
 ```
 The values of the optional arguments are the default values.

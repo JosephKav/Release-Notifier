@@ -38,6 +38,7 @@ type MonitorDefaults struct {
 	AccessToken       string `yaml:"access_token"`  // GitHub access token.
 	AllowInvalidCerts string `yaml:"allow_invalid"` // default - false = Disallows invalid HTTPS certificates.
 	Interval          int    `yaml:"interval"`      // Interval (in seconds) between each version check.
+	IgnoreMiss        string `yaml:"ignore_misses"` // Ignore URLCommands that fail (e.g. split on text that doesn't exist)
 }
 
 // SlackDefaults are the defaults for Slack.
@@ -67,6 +68,11 @@ func (d *Defaults) setDefaults() {
 	if d.Monitor.Interval == 0 {
 		d.Monitor.Interval = 600
 	}
+	if strings.ToLower(d.Monitor.IgnoreMiss) == "true" || strings.ToLower(d.Monitor.IgnoreMiss) == "yes" {
+		d.Monitor.IgnoreMiss = "y"
+	} else {
+		d.Monitor.IgnoreMiss = "n"
+	}
 
 	// SlackDefaults defaults.
 	if d.Slack.Message == "" {
@@ -89,7 +95,7 @@ func (d *Defaults) setDefaults() {
 	if d.WebHook.MaxTries == 0 {
 		d.WebHook.MaxTries = 3
 	}
-	if strings.ToLower(d.WebHook.SilentFails) == "true" {
+	if strings.ToLower(d.WebHook.SilentFails) == "true" || strings.ToLower(d.WebHook.SilentFails) == "yes" {
 		d.WebHook.SilentFails = "y"
 	} else {
 		d.WebHook.SilentFails = "n"
@@ -139,8 +145,9 @@ func main() {
 	config.setDefaults()
 
 	sites := ""
-	for _, service := range config.Services {
-		for _, monitor := range service.Monitor {
+	for sIndex, service := range config.Services {
+		for mIndex, monitor := range service.Monitor {
+			config.Services[sIndex].Monitor[mIndex].status.init()
 			sites = fmt.Sprintf("%s, %s", sites, monitor.ID)
 		}
 	}

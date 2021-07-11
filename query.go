@@ -10,7 +10,7 @@ import (
 	"strings"
 )
 
-// MonitorSlice is an array of Monitor's.
+// MonitorSlice is an array of Monitor.
 type MonitorSlice []Monitor
 
 // Monitor is a source to be monitored and provides everything needed to extract
@@ -53,7 +53,7 @@ func (m *MonitorSlice) UnmarshalYAML(unmarshal func(interface{}) error) error {
 	return nil
 }
 
-// URLCommandSlice is an array of URLCommand's to be used to filter version from the URL Content.
+// URLCommandSlice is an array of URLCommand to be used to filter version from the URL Content.
 type URLCommandSlice []URLCommand
 
 // UnmarshalYAML allows handling of a dict as well as a list of dicts.
@@ -81,12 +81,13 @@ func (u *URLCommandSlice) UnmarshalYAML(unmarshal func(interface{}) error) error
 
 // URLCommand is a command to be ran to filter version from the URL body.
 type URLCommand struct {
-	Type  string `yaml:"type"`  // "regex"/"replace"/"split"
-	Regex string `yaml:"regex"` // regexp.MustCompile(Regex)
-	Index int    `yaml:"index"` // re.FindAllString(URL_content, -1)[Index]  /  strings.Split("text")[Index]
-	Old   string `yaml:"old"`   // strings.ReplaceAll(tgtString, "Old", "New")
-	New   string `yaml:"new"`   // strings.ReplaceAll(tgtString, "Old", "New")
-	Text  string `yaml:"text"`  // strings.Split(tgtString, "Text")
+	Type       string `yaml:"type"`          // "regex"/"regex_submatch"/"replace"/"split"
+	Regex      string `yaml:"regex"`         // regexp.MustCompile(Regex)
+	Index      int    `yaml:"index"`         // re.FindAllString(URL_content, -1)[Index]  /  strings.Split("text")[Index]
+	Old        string `yaml:"old"`           // strings.ReplaceAll(tgtString, "Old", "New")
+	New        string `yaml:"new"`           // strings.ReplaceAll(tgtString, "Old", "New")
+	Text       string `yaml:"text"`          // strings.Split(tgtString, "Text")
+	IgnoreMiss string `yaml:"ignore_misses"` // Ignore this command failing (e.g. split on text that doesn't exist)
 }
 
 // status is the current state of the Monitor element (version and regex misses).
@@ -94,6 +95,12 @@ type status struct {
 	version            string // Latest version found from query().
 	regexMissesContent int    // Counter for the number of regex misses on URL content.
 	regexMissesVersion int    // Counter for the number of regex misses on version.
+	monitorMisses      string // "1000" 1 = miss, 0 = no miss for split etc.
+}
+
+// setDefaults sets the defaults for undefined Monitor values using defaults.
+func (s *status) init() {
+	s.monitorMisses = "0000"
 }
 
 // setDefaults sets the defaults for undefined Monitor values using defaults.
@@ -184,6 +191,29 @@ func (m *Monitor) setDefaults(defaults Defaults) {
 			m.URL = fmt.Sprintf("https://api.github.com/repos/%s/releases/latest", m.URL)
 		}
 	}
+
+	if len(m.URLCommands) != 0 {
+		m.URLCommands.setDefaults(defaults)
+	}
+}
+
+// setDefaults sets the defaults for undefined Monitor values using defaults.
+func (c *URLCommandSlice) setDefaults(defaults Defaults) {
+	for index := range *c {
+		(*c)[index].setDefaults(defaults)
+	}
+}
+
+// setDefaults sets the defaults for each undefined var using defaults.
+func (c *URLCommand) setDefaults(defaults Defaults) {
+	// Default IgnoreMiss
+	if c.IgnoreMiss == "" {
+		c.IgnoreMiss = defaults.Monitor.IgnoreMiss
+	} else if strings.ToLower(c.IgnoreMiss) == "true" || strings.ToLower(c.IgnoreMiss) == "yes" {
+		c.IgnoreMiss = "y"
+	} else {
+		c.IgnoreMiss = "n"
+	}
 }
 
 // setVersion sets Monitor.Version to v.
@@ -205,6 +235,16 @@ func regexCheckContent(re string, text string, version string) bool {
 	re = strings.ReplaceAll(re, "${version}", version)
 	re = strings.ReplaceAll(re, "${version_no_v}", strings.ReplaceAll(version, "v", ""))
 	return regexCheck(re, text)
+}
+
+// replaceAtIndex replaces the character at index of str with replacement
+func replaceAtIndex(str string, replacement rune, index int) string {
+	return str[:index] + string(replacement) + str[index+1:]
+}
+
+// getAtIndex returns the character at index of str
+func getAtIndex(str string, index int) string {
+	return str[index : index+1]
 }
 
 // query queries the Monitor source, updating Monitor.Version
@@ -268,12 +308,23 @@ func (m *Monitor) query(i int) bool {
 	} else {
 		// Iterate through the commands to filter out the version.
 		for _, command := range m.URLCommands {
+			versionBak := version
 			switch command.Type {
 			case "split":
 				versions := strings.Split(version, command.Text)
 
 				if len(versions) == 1 {
-					log.Printf("WARNING: %s, %s didn't find any '%s' to split on", m.ID, command.Type, command.Text)
+					if getAtIndex(m.status.monitorMisses, 0) == "0" {
+						log.Printf("WARNING: %s, %s didn't find any '%s' to split on", m.ID, command.Type, command.Text)
+						m.status.monitorMisses = replaceAtIndex(m.status.monitorMisses, '1', 0)
+					}
+					// Stop if miss
+					if command.IgnoreMiss == "n" {
+						return false
+					}
+					// Ignore Misses
+					version = versionBak
+					continue
 				}
 
 				index := command.Index
@@ -283,7 +334,16 @@ func (m *Monitor) query(i int) bool {
 				}
 
 				if (len(versions) - index) < 1 {
-					log.Printf("WARNING: %s, %s returned %d elements but the index wants element number %d", m.ID, command.Type, len(versions), (index + 1))
+					if getAtIndex(m.status.monitorMisses, 1) == "0" {
+						log.Printf("WARNING: %s, %s (%s) returned %d elements but the index wants element number %d", m.ID, command.Type, command.Text, len(versions), (index + 1))
+						m.status.monitorMisses = replaceAtIndex(m.status.monitorMisses, '1', 1)
+					}
+					// Stop if miss
+					if command.IgnoreMiss == "n" {
+						return false
+					}
+					// Ignore Misses
+					version = versionBak
 					continue
 				}
 
@@ -298,13 +358,22 @@ func (m *Monitor) query(i int) bool {
 					versions = re.FindAllString(version, -1)
 				} else if command.Type == "regex_submatch" {
 					if command.Index < 0 {
-						log.Printf("WARNING: %s, %s shouldn't use negative indices as the array is always made up from the first match.", m.ID, command.Type)
+						log.Printf("WARNING: %s, %s (%s) shouldn't use negative indices as the array is always made up from the first match.", m.ID, command.Type, command.Regex)
 					}
 					versions = re.FindStringSubmatch(version)
 				}
 
 				if len(versions) == 0 {
-					log.Printf("INFO: %s, %s didn't return any matches", m.ID, command.Type)
+					if getAtIndex(m.status.monitorMisses, 2) == "0" {
+						log.Printf("WARNING: %s, %s (%s) didn't return any matches", m.ID, command.Type, command.Regex)
+						m.status.monitorMisses = replaceAtIndex(m.status.monitorMisses, '1', 2)
+					}
+					// Stop if miss
+					if command.IgnoreMiss == "n" {
+						return false
+					}
+					// Ignore Misses
+					version = versionBak
 					continue
 				}
 
@@ -315,13 +384,22 @@ func (m *Monitor) query(i int) bool {
 				}
 
 				if (len(versions) - index) < 1 {
-					log.Printf("WARNING: %s, %s returned %d elements but the index wants element number %d", m.ID, command.Type, len(versions), (index + 1))
+					if getAtIndex(m.status.monitorMisses, 3) == "0" {
+						log.Printf("WARNING: %s, %s (%s) returned %d elements but the index wants element number %d", m.ID, command.Type, command.Regex, len(versions), (index + 1))
+						m.status.monitorMisses = replaceAtIndex(m.status.monitorMisses, '1', 3)
+					}
+					// Stop if miss
+					if command.IgnoreMiss == "n" {
+						return false
+					}
+					// Ignore Misses
+					version = versionBak
 					continue
 				}
 
 				version = versions[index]
 			default:
-				log.Printf("ERROR: %s, %s is an unknown type for URL_Commands", m.ID, command.Type)
+				log.Printf("ERROR: %s, %s is an unknown type for url_commands", m.ID, command.Type)
 				continue
 			}
 		}

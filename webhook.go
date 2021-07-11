@@ -18,7 +18,7 @@ import (
 	"time"
 )
 
-// WebHookSlice is an array of WebHook's.
+// WebHookSlice is an array of WebHook.
 type WebHookSlice []WebHook
 
 // WebHook is a WebHook to send.
@@ -148,7 +148,7 @@ func (w *WebHookSlice) send(serviceID string, mon *Monitor, slacks SlackSlice) {
 	}
 }
 
-// send will send a WebHook to the WebHook's URL with the body sha1 and sha256 encrypted with WebHook.Secret.
+// send will send a WebHook to the WebHook URL with the body sha1 and sha256 encrypted with WebHook.Secret.
 // It also simulates other GitHub headers and returns when an error is encountered.
 func (w *WebHook) send(serviceID string) error {
 	// GitHub style payload.
