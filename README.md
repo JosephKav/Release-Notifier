@@ -1,5 +1,7 @@
 # Release-Notifier
+[![Go Report Card](https://goreportcard.com/badge/github.com/JosephKav/Release-Notifier)](https://goreportcard.com/report/github.com/JosephKav/Release-Notifier)
 [![Build](https://github.com/JosephKav/Release-Notifier/actions/workflows/build.yml/badge.svg)](https://github.com/JosephKav/Release-Notifier/actions/workflows/build.yml)
+[![GitHub Release](https://img.shields.io/github/release/JosephKav/Release-Notifier.svg?logo=github&style=flat-square&color=blue)](https://github.com/JosephKav/Release-Notifier/releases)
 
 Release-Notifier will query websites at a user defined interval for new software releases and then trigger a WebHook/Slack notification when one has been found.
 For example, you could set it to monitor the Gitea repo ([go-gitea/gitea](https://github.com/go-gitea/gitea)). This will query the [GitHub API](https://api.github.com/repos/go-gitea/gitea/releases/latest) and track the "tag_name" variable. When this variable changes from what it was on a previous query, an AWX 'GitHub' WebHook could be triggered to update Gitea on your server.
