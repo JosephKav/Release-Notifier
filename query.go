@@ -63,7 +63,7 @@ type URLCommandSlice []URLCommand
 // e.g.    URLCommandSlice: { type: "split" }
 //
 // becomes URLCommandSlice: [ { type: "split" } ]
-func (u *URLCommandSlice) UnmarshalYAML(unmarshal func(interface{}) error) error {
+func (c *URLCommandSlice) UnmarshalYAML(unmarshal func(interface{}) error) error {
 	var multi []URLCommand
 	err := unmarshal(&multi)
 	if err != nil {
@@ -72,9 +72,9 @@ func (u *URLCommandSlice) UnmarshalYAML(unmarshal func(interface{}) error) error
 		if err != nil {
 			return err
 		}
-		*u = []URLCommand{single}
+		*c = []URLCommand{single}
 	} else {
-		*u = multi
+		*c = multi
 	}
 	return nil
 }
