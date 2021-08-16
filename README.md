@@ -100,7 +100,9 @@ defaults:
   monitor:
     interval: 600
     access_token: 'GITHUB_ACCESS_TOKEN'
+    progressive_versioning: true
     allow_invalid: false
+    ignore_misses: false
   slack:
     message: '<${monitor_url}|${monitor_id}> - ${version} released'
     username: 'Release Notifier'
@@ -119,6 +121,7 @@ defaults:
   monitor:
     interval: 600                       # Time between monitor queries.
     access_token: 'GITHUB_ACCESS_TOKEN' # Increase API rate limit with an access token (and allow querying private repos). Used when type="github".
+    progressive_versioning: true        # Only send Slack(s) and/or WebHook(s) when the version increases.
     allow_invalid: false                # Allow invalid HTTPS Certificates.
     ignore_misses: false                # Ignore url_command fails (e.g. split on text that doesn't exist)
 ```
@@ -205,6 +208,7 @@ services:
           ignore_misses: false                             # Optional. Ignore fails (e.g. split on text that doesn't exist or no regex match)
       regex_content: "abc-[a-z]+-${version}_amd64.deb" # Optional. This regex must exist on the URL content to be classed as a new release.
       regex_version: '^v[0-9.]+$'                      # Optional. The version found must contain matching regex to be classed as a new release.
+      progressive_versioning: true                     # Optional. # Only send Slack(s) and/or WebHook(s) when the version increases.
       allow_invalid: false                             # Optional. Allow invalid HTTPS Certificates.
       access_token: 'GITHUB_ACCESS_TOKEN'              # Optional. GitHub access token to use. Allows smaller interval (higher API rate limit).
       skip_slack: false                                # Optional. Don't send Slack messages for new releases of this monitor.

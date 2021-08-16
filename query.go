@@ -8,6 +8,8 @@ import (
 	"net/http"
 	"regexp"
 	"strings"
+
+	"github.com/coreos/go-semver/semver"
 )
 
 // MonitorSlice is an array of Monitor.
@@ -16,18 +18,19 @@ type MonitorSlice []Monitor
 // Monitor is a source to be monitored and provides everything needed to extract
 // the latest version from the URL provided.
 type Monitor struct {
-	ID                string          `yaml:"id"`
-	Type              string          `yaml:"type"`          // "github"/"URL"
-	URL               string          `yaml:"url"`           // type:URL - "https://example.com", type:github - "owner/repo" or "https://github.com/owner/repo".
-	URLCommands       URLCommandSlice `yaml:"url_commands"`  // Commands to filter the release from the URL request.
-	RegexContent      string          `yaml:"regex_content"` // "abc-[a-z]+-${version}_amd64.deb" This regex must exist in the body of the URL to trigger new version actions.
-	RegexVersion      string          `yaml:"regex_version"` // "v*[0-9.]+" The version found must match this release to trigger new version actions.
-	AllowInvalidCerts string          `yaml:"allow_invalid"` // default - false = Disallows invalid HTTPS certificates.
-	AccessToken       string          `yaml:"access_token"`  // GitHub access token to use.
-	SkipSlack         bool            `yaml:"skip_slack"`    // default - false = Don't skip Slack messages for new releases.
-	SkipWebHook       bool            `yaml:"skip_webhook"`  // default - false = Don't skip WebHooks for new releases.
-	Interval          int             `yaml:"interval"`      // 600 = Sleep 600 seconds between queries.
-	status            status          ``                     // Track the Status of this source (version and regex misses).
+	ID                    string          `yaml:"id"`
+	Type                  string          `yaml:"type"`                   // "github"/"URL"
+	URL                   string          `yaml:"url"`                    // type:URL - "https://example.com", type:github - "owner/repo" or "https://github.com/owner/repo".
+	URLCommands           URLCommandSlice `yaml:"url_commands"`           // Commands to filter the release from the URL request.
+	RegexContent          string          `yaml:"regex_content"`          // "abc-[a-z]+-${version}_amd64.deb" This regex must exist in the body of the URL to trigger new version actions.
+	RegexVersion          string          `yaml:"regex_version"`          // "v*[0-9.]+" The version found must match this release to trigger new version actions.
+	ProgressiveVersioning string          `yaml:"progressive_versioning"` // default - true  = Version has to be greater than the previous to trigger Slack(s)/WebHook(s)
+	AllowInvalidCerts     string          `yaml:"allow_invalid"`          // default - false = Disallows invalid HTTPS certificates.
+	AccessToken           string          `yaml:"access_token"`           // GitHub access token to use.
+	SkipSlack             bool            `yaml:"skip_slack"`             // default - false = Don't skip Slack messages for new releases.
+	SkipWebHook           bool            `yaml:"skip_webhook"`           // default - false = Don't skip WebHooks for new releases.
+	Interval              int             `yaml:"interval"`               // 600 = Sleep 600 seconds between queries.
+	status                status          ``                              // Track the Status of this source (version and regex misses).
 }
 
 // UnmarshalYAML allows handling of a dict as well as a list of dicts.
@@ -124,6 +127,15 @@ func (m *Monitor) setDefaults(defaults Defaults) {
 		m.AllowInvalidCerts = "y"
 	} else {
 		m.AllowInvalidCerts = "n"
+	}
+
+	// Default progressive versioning (versions have to be successive to notify)
+	if m.ProgressiveVersioning == "" {
+		m.ProgressiveVersioning = defaults.Monitor.ProgressiveVersioning
+	} else if strings.ToLower(m.ProgressiveVersioning) == "false" || strings.ToLower(m.ProgressiveVersioning) == "no" {
+		m.ProgressiveVersioning = "n"
+	} else {
+		m.ProgressiveVersioning = "y"
 	}
 
 	// Default ID if undefined/blank.
@@ -406,6 +418,20 @@ func (m *Monitor) query(i int) bool {
 	}
 	// If this version is different (new).
 	if version != m.status.version {
+		// Check for a progressive change in version
+		if m.ProgressiveVersioning == "y" {
+			oldVersion := semver.New(m.status.version)
+			newVersion := semver.New(version)
+
+			// e.g.
+			// newVersion = 1.2.9
+			// oldVersion = 1.2.10
+			// return false (don't notify anything. Stay on oldVersion)
+			if newVersion.LessThan(*oldVersion) {
+				return false
+			}
+		}
+
 		// Check for a regex match in the body if one is desired.
 		if m.RegexContent != "" {
 			regexMatch := regexCheckContent(m.RegexContent, body, version)
