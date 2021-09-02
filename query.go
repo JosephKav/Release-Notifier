@@ -420,8 +420,14 @@ func (m *Monitor) query(i int) bool {
 	if version != m.status.version {
 		// Check for a progressive change in version
 		if m.ProgressiveVersioning == "y" {
-			oldVersion := semver.New(m.status.version)
-			newVersion := semver.New(version)
+			oldVersion, err := semver.NewVersion(m.status.version)
+			if err != nil {
+				return false
+			}
+			newVersion, err := semver.NewVersion(version)
+			if err != nil {
+				return false
+			}
 
 			// e.g.
 			// newVersion = 1.2.9
