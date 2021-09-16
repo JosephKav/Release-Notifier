@@ -18,6 +18,7 @@ import (
 
 var (
 	verbose = flag.Bool("verbose", false, "Toggle verbose logging")
+	debug   = flag.Bool("debug", false, "Toggle debug logging")
 )
 
 // Config is the config for Release-Notifier.

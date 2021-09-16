@@ -321,6 +321,9 @@ func (m *Monitor) query(i int) bool {
 		// Iterate through the commands to filter out the version.
 		for _, command := range m.URLCommands {
 			versionBak := version
+			if *debug {
+				log.Printf("DEBUG: Looking through %s", version)
+			}
 			switch command.Type {
 			case "split":
 				versions := strings.Split(version, command.Text)
@@ -414,8 +417,12 @@ func (m *Monitor) query(i int) bool {
 				log.Printf("ERROR: %s, %s is an unknown type for url_commands", m.ID, command.Type)
 				continue
 			}
+			if *debug {
+				log.Printf("DEBUG: Resolved to %s", version)
+			}
 		}
 	}
+	log.Printf("INFO: %s, Starting Release - %s", m.ID, version)
 	// If this version is different (new).
 	if version != m.status.version {
 		// Check for a progressive change in version
@@ -466,6 +473,7 @@ func (m *Monitor) query(i int) bool {
 		m.status.regexMissesVersion = 0
 
 		// First version found.
+		log.Printf("INFO: %s, Starting Release - %s", m.ID, version)
 		if m.status.version == "" {
 			m.setVersion(version)
 			log.Printf("INFO: %s, Starting Release - %s", m.ID, version)
