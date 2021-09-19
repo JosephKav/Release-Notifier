@@ -422,7 +422,7 @@ func (m *Monitor) query(i int) bool {
 			}
 		}
 	}
-	log.Printf("INFO: %s, Starting Release - %s", m.ID, version)
+
 	// If this version is different (new).
 	if version != m.status.version {
 		// Check for a progressive change in version
@@ -473,7 +473,6 @@ func (m *Monitor) query(i int) bool {
 		m.status.regexMissesVersion = 0
 
 		// First version found.
-		log.Printf("INFO: %s, Starting Release - %s", m.ID, version)
 		if m.status.version == "" {
 			m.setVersion(version)
 			log.Printf("INFO: %s, Starting Release - %s", m.ID, version)
