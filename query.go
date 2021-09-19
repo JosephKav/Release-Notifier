@@ -426,7 +426,7 @@ func (m *Monitor) query(i int) bool {
 	// If this version is different (new).
 	if version != m.status.version {
 		// Check for a progressive change in version
-		if m.ProgressiveVersioning == "y" {
+		if m.ProgressiveVersioning == "y" && m.status.version != "" {
 			oldVersion, err := semver.NewVersion(m.status.version)
 			if err != nil {
 				return false

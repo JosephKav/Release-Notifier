@@ -25,7 +25,7 @@ func (s *ServiceSlice) track() {
 	for serviceIndex := range *s {
 		for monitorIndex := range (*s)[serviceIndex].Monitor {
 			if *verbose {
-				log.Printf("DEBUG: Tracking %s at %s every %d seconds", (*s)[serviceIndex].Monitor[monitorIndex].ID, (*s)[serviceIndex].Monitor[monitorIndex].URL, (*s)[serviceIndex].Monitor[monitorIndex].Interval)
+				log.Printf("VERBOSE: Tracking %s at %s every %d seconds", (*s)[serviceIndex].Monitor[monitorIndex].ID, (*s)[serviceIndex].Monitor[monitorIndex].URL, (*s)[serviceIndex].Monitor[monitorIndex].Interval)
 			}
 
 			// Track this Monitor in a infinite loop goroutine.
