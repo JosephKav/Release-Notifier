@@ -37,6 +37,7 @@ $ release_notifier -config myConfig.yml
 2021/06/10 16:13:49 INFO: Grafana, Slack message sent
 2021/06/10 16:13:50 INFO: Grafana, WebHook received (202)
 ```
+![image](https://user-images.githubusercontent.com/4267227/138481247-cbee6073-bf6c-4be2-8b2e-875f3719e738.png)
 
 ## Command-line arguments
 ```bash
