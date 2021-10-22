@@ -6,8 +6,10 @@ import (
 	"io/ioutil"
 	"log"
 	"net/http"
+	"os"
 	"regexp"
 	"strings"
+	"time"
 
 	"github.com/coreos/go-semver/semver"
 )
@@ -24,12 +26,13 @@ type Monitor struct {
 	URLCommands           URLCommandSlice `yaml:"url_commands"`           // Commands to filter the release from the URL request.
 	RegexContent          string          `yaml:"regex_content"`          // "abc-[a-z]+-${version}_amd64.deb" This regex must exist in the body of the URL to trigger new version actions.
 	RegexVersion          string          `yaml:"regex_version"`          // "v*[0-9.]+" The version found must match this release to trigger new version actions.
-	ProgressiveVersioning string          `yaml:"progressive_versioning"` // default - true  = Version has to be greater than the previous to trigger Slack(s)/WebHook(s)
+	ProgressiveVersioning string          `yaml:"progressive_versioning"` // default - true  = Version has to be greater than the previous to trigger Slack(s)/WebHook(s).
 	AllowInvalidCerts     string          `yaml:"allow_invalid"`          // default - false = Disallows invalid HTTPS certificates.
 	AccessToken           string          `yaml:"access_token"`           // GitHub access token to use.
+	Interval              int             `yaml:"interval"`               // 600 = Sleep 600 seconds between queries.
 	SkipSlack             bool            `yaml:"skip_slack"`             // default - false = Don't skip Slack messages for new releases.
 	SkipWebHook           bool            `yaml:"skip_webhook"`           // default - false = Don't skip WebHooks for new releases.
-	Interval              int             `yaml:"interval"`               // 600 = Sleep 600 seconds between queries.
+	Slack                 Slack           `yaml:"slack"`                  // Override Slack message vars.
 	status                status          ``                              // Track the Status of this source (version and regex misses).
 }
 
@@ -93,6 +96,24 @@ type URLCommand struct {
 	IgnoreMiss string `yaml:"ignore_misses"` // Ignore this command failing (e.g. split on text that doesn't exist)
 }
 
+// checkValues will check the variables for all of this services Slack recipients.
+func (m *MonitorSlice) checkValues(serviceID string) {
+	for index := range *m {
+		(*m)[index].checkValues(serviceID, index)
+	}
+}
+
+// checkValues will check that the variables are valid for this Slack recipient.
+func (m *Monitor) checkValues(serviceID string, index int) {
+	if m.Slack.Delay != "" {
+		_, err := time.ParseDuration(m.Slack.Delay)
+		if err != nil {
+			fmt.Printf("ERROR: %s.slack[%d].delay (%s) is invalid (Use 'AhBmCs' duration format)", serviceID, index, m.Slack.Delay)
+			os.Exit(1)
+		}
+	}
+}
+
 // status is the current state of the Monitor element (version and regex misses).
 type status struct {
 	version            string // Latest version found from query().
@@ -115,12 +136,12 @@ func (m *MonitorSlice) setDefaults(defaults Defaults) {
 
 // setDefaults sets the defaults for each undefined var using defaults.
 func (m *Monitor) setDefaults(defaults Defaults) {
-	// Default GitHub Access Token
+	// Default GitHub Access Token.
 	if m.AccessToken == "" {
 		m.AccessToken = defaults.Monitor.AccessToken
 	}
 
-	// Default allowance/rejection of invalid certs
+	// Default allowance/rejection of invalid certs.
 	if m.AllowInvalidCerts == "" {
 		m.AllowInvalidCerts = defaults.Monitor.AllowInvalidCerts
 	} else if strings.ToLower(m.AllowInvalidCerts) == "true" || strings.ToLower(m.AllowInvalidCerts) == "yes" {
@@ -188,7 +209,7 @@ func (m *Monitor) setDefaults(defaults Defaults) {
 		}
 	}
 
-	// GitHub - Convert to API URL
+	// GitHub - Convert to API URL.
 	if m.Type == "github" {
 		// If it's "owner/repo" rather than a full path.
 		if strings.Count(m.URL, "/") == 1 {
@@ -204,9 +225,7 @@ func (m *Monitor) setDefaults(defaults Defaults) {
 		}
 	}
 
-	if len(m.URLCommands) != 0 {
-		m.URLCommands.setDefaults(defaults)
-	}
+	m.URLCommands.setDefaults(defaults)
 }
 
 // setDefaults sets the defaults for undefined Monitor values using defaults.
@@ -218,7 +237,7 @@ func (c *URLCommandSlice) setDefaults(defaults Defaults) {
 
 // setDefaults sets the defaults for each undefined var using defaults.
 func (c *URLCommand) setDefaults(defaults Defaults) {
-	// Default IgnoreMiss
+	// Default IgnoreMiss.
 	if c.IgnoreMiss == "" {
 		c.IgnoreMiss = defaults.Monitor.IgnoreMiss
 	} else if strings.ToLower(c.IgnoreMiss) == "true" || strings.ToLower(c.IgnoreMiss) == "yes" {
@@ -254,7 +273,7 @@ func replaceAtIndex(str string, replacement rune, index int) string {
 	return str[:index] + string(replacement) + str[index+1:]
 }
 
-// getAtIndex returns the character at index of str
+// getAtIndex returns the character at index of str.
 func getAtIndex(str string, index int) string {
 	return str[index : index+1]
 }
@@ -317,130 +336,133 @@ func (m *Monitor) query(i int) bool {
 		version = strings.Split(version, ",")[0]
 		version = strings.Split(version, `"`)[1]
 		// Raw URL Monitor.
-	} else {
-		// Iterate through the commands to filter out the version.
-		for _, command := range m.URLCommands {
-			versionBak := version
-			if *debug {
-				log.Printf("DEBUG: Looking through %s", version)
-			}
-			switch command.Type {
-			case "split":
-				versions := strings.Split(version, command.Text)
+	}
 
-				if len(versions) == 1 {
-					if getAtIndex(m.status.monitorMisses, 0) == "0" {
-						log.Printf("WARNING: %s, %s didn't find any '%s' to split on", m.ID, command.Type, command.Text)
-						m.status.monitorMisses = replaceAtIndex(m.status.monitorMisses, '1', 0)
-					}
-					// Stop if miss
-					if command.IgnoreMiss == "n" {
-						return false
-					}
-					// Ignore Misses
-					version = versionBak
-					continue
+	// Iterate through the commands to filter out the version.
+	for _, command := range m.URLCommands {
+		versionBak := version
+		if *debug {
+			log.Printf("DEBUG: Looking through %s", version)
+		}
+		switch command.Type {
+		case "split":
+			versions := strings.Split(version, command.Text)
+
+			if len(versions) == 1 {
+				if getAtIndex(m.status.monitorMisses, 0) == "0" {
+					log.Printf("WARNING: %s, %s didn't find any '%s' to split on", m.ID, command.Type, command.Text)
+					m.status.monitorMisses = replaceAtIndex(m.status.monitorMisses, '1', 0)
 				}
-
-				index := command.Index
-				// Handle negative indices.
-				if index < 0 {
-					index = len(versions) + index
+				// Stop if miss.
+				if command.IgnoreMiss == "n" {
+					return false
 				}
-
-				if (len(versions) - index) < 1 {
-					if getAtIndex(m.status.monitorMisses, 1) == "0" {
-						log.Printf("WARNING: %s, %s (%s) returned %d elements but the index wants element number %d", m.ID, command.Type, command.Text, len(versions), (index + 1))
-						m.status.monitorMisses = replaceAtIndex(m.status.monitorMisses, '1', 1)
-					}
-					// Stop if miss
-					if command.IgnoreMiss == "n" {
-						return false
-					}
-					// Ignore Misses
-					version = versionBak
-					continue
-				}
-
-				version = versions[index]
-			case "replace":
-				version = strings.ReplaceAll(version, command.Old, command.New)
-			case "regex", "regex_submatch":
-				re := regexp.MustCompile(command.Regex)
-
-				var versions []string
-				if command.Type == "regex" {
-					versions = re.FindAllString(version, -1)
-				} else if command.Type == "regex_submatch" {
-					if command.Index < 0 {
-						log.Printf("WARNING: %s, %s (%s) shouldn't use negative indices as the array is always made up from the first match.", m.ID, command.Type, command.Regex)
-					}
-					versions = re.FindStringSubmatch(version)
-				}
-
-				if len(versions) == 0 {
-					if getAtIndex(m.status.monitorMisses, 2) == "0" {
-						log.Printf("WARNING: %s, %s (%s) didn't return any matches", m.ID, command.Type, command.Regex)
-						m.status.monitorMisses = replaceAtIndex(m.status.monitorMisses, '1', 2)
-					}
-					// Stop if miss
-					if command.IgnoreMiss == "n" {
-						return false
-					}
-					// Ignore Misses
-					version = versionBak
-					continue
-				}
-
-				index := command.Index
-				// Handle negative indices.
-				if command.Index < 0 {
-					index = len(versions) + command.Index
-				}
-
-				if (len(versions) - index) < 1 {
-					if getAtIndex(m.status.monitorMisses, 3) == "0" {
-						log.Printf("WARNING: %s, %s (%s) returned %d elements but the index wants element number %d", m.ID, command.Type, command.Regex, len(versions), (index + 1))
-						m.status.monitorMisses = replaceAtIndex(m.status.monitorMisses, '1', 3)
-					}
-					// Stop if miss
-					if command.IgnoreMiss == "n" {
-						return false
-					}
-					// Ignore Misses
-					version = versionBak
-					continue
-				}
-
-				version = versions[index]
-			default:
-				log.Printf("ERROR: %s, %s is an unknown type for url_commands", m.ID, command.Type)
+				// Ignore Misses.
+				version = versionBak
 				continue
 			}
-			if *debug {
-				log.Printf("DEBUG: Resolved to %s", version)
+
+			index := command.Index
+			// Handle negative indices.
+			if index < 0 {
+				index = len(versions) + index
 			}
+
+			if (len(versions) - index) < 1 {
+				if getAtIndex(m.status.monitorMisses, 1) == "0" {
+					log.Printf("WARNING: %s, %s (%s) returned %d elements but the index wants element number %d", m.ID, command.Type, command.Text, len(versions), (index + 1))
+					m.status.monitorMisses = replaceAtIndex(m.status.monitorMisses, '1', 1)
+				}
+				// Stop if miss.
+				if command.IgnoreMiss == "n" {
+					return false
+				}
+				// Ignore Misses.
+				version = versionBak
+				continue
+			}
+
+			version = versions[index]
+		case "replace":
+			version = strings.ReplaceAll(version, command.Old, command.New)
+		case "regex", "regex_submatch":
+			re := regexp.MustCompile(command.Regex)
+
+			var versions []string
+			if command.Type == "regex" {
+				versions = re.FindAllString(version, -1)
+			} else if command.Type == "regex_submatch" {
+				if command.Index < 0 {
+					log.Printf("WARNING: %s, %s (%s) shouldn't use negative indices as the array is always made up from the first match.", m.ID, command.Type, command.Regex)
+				}
+				versions = re.FindStringSubmatch(version)
+			}
+
+			if len(versions) == 0 {
+				if getAtIndex(m.status.monitorMisses, 2) == "0" {
+					log.Printf("WARNING: %s, %s (%s) didn't return any matches", m.ID, command.Type, command.Regex)
+					m.status.monitorMisses = replaceAtIndex(m.status.monitorMisses, '1', 2)
+				}
+				// Stop if miss.
+				if command.IgnoreMiss == "n" {
+					return false
+				}
+				// Ignore Misses.
+				version = versionBak
+				continue
+			}
+
+			index := command.Index
+			// Handle negative indices.
+			if command.Index < 0 {
+				index = len(versions) + command.Index
+			}
+
+			if (len(versions) - index) < 1 {
+				if getAtIndex(m.status.monitorMisses, 3) == "0" {
+					log.Printf("WARNING: %s, %s (%s) returned %d elements but the index wants element number %d", m.ID, command.Type, command.Regex, len(versions), (index + 1))
+					m.status.monitorMisses = replaceAtIndex(m.status.monitorMisses, '1', 3)
+				}
+				// Stop if miss.
+				if command.IgnoreMiss == "n" {
+					return false
+				}
+				// Ignore Misses.
+				version = versionBak
+				continue
+			}
+
+			version = versions[index]
+		default:
+			log.Printf("ERROR: %s, %s is an unknown type for url_commands", m.ID, command.Type)
+			continue
+		}
+		if *debug {
+			log.Printf("DEBUG: Resolved to %s", version)
 		}
 	}
 
 	// If this version is different (new).
 	if version != m.status.version {
-		// Check for a progressive change in version
+		// Check for a progressive change in version.
 		if m.ProgressiveVersioning == "y" && m.status.version != "" {
+			failedSemanticVersioning := false
 			oldVersion, err := semver.NewVersion(m.status.version)
 			if err != nil {
-				return false
+				log.Printf("ERROR: %s, failed converting '%s' to a semantic version", m.ID, m.status.version)
+				failedSemanticVersioning = true
 			}
 			newVersion, err := semver.NewVersion(version)
 			if err != nil {
-				return false
+				log.Printf("ERROR: %s, failed converting '%s' to a semantic version", m.ID, version)
+				failedSemanticVersioning = true
 			}
 
 			// e.g.
 			// newVersion = 1.2.9
 			// oldVersion = 1.2.10
 			// return false (don't notify anything. Stay on oldVersion)
-			if newVersion.LessThan(*oldVersion) {
+			if !failedSemanticVersioning && newVersion.LessThan(*oldVersion) {
 				return false
 			}
 		}
@@ -468,12 +490,20 @@ func (m *Monitor) query(i int) bool {
 			}
 		}
 
-		// Found new version, so reset regex misses
+		// Found new version, so reset regex misses.
 		m.status.regexMissesContent = 0
 		m.status.regexMissesVersion = 0
 
 		// First version found.
 		if m.status.version == "" {
+			if m.ProgressiveVersioning == "y" {
+				_, err := semver.NewVersion(version)
+				if err != nil {
+					log.Printf("ERROR: %s[%d], failed converting '%s' to a semantic version. If all versions are in this style, consider adding url_commands to get the version into the style of '1.2.3a' (https://semver.org/), or disabling progressive versioning (globally with defaults.monitor.progressive_versioning or just for this service with the progressive_versioning var)", m.ID, i, version)
+					return false
+				}
+			}
+
 			m.setVersion(version)
 			log.Printf("INFO: %s, Starting Release - %s", m.ID, version)
 			// Don't notify on first version.

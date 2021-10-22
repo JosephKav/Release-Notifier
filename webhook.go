@@ -13,6 +13,7 @@ import (
 	"log"
 	"math/rand"
 	"net/http"
+	"os"
 	"strconv"
 	"strings"
 	"time"
@@ -27,8 +28,9 @@ type WebHook struct {
 	URL               string `yaml:"url"`                 // "https://example.com"
 	Secret            string `yaml:"secret"`              // "SECRET"
 	DesiredStatusCode int    `yaml:"desired_status_code"` // e.g. 202
+	Delay             string `yaml:"delay"`               // The delay before sending the WebHook.
 	MaxTries          int    `yaml:"maxtries"`            // Number of times to attempt sending the WebHook if the desired status code is not received.
-	SilentFails       string `yaml:"silent_fails"`        // Whether to notify if this WebHook fails MaxTries times
+	SilentFails       string `yaml:"silent_fails"`        // Whether to notify if this WebHook fails MaxTries times.
 }
 
 // UnmarshalYAML allows handling of a dict as well as a list of dicts.
@@ -67,6 +69,10 @@ func (w *WebHook) setDefaults(defaults Defaults) {
 		w.DesiredStatusCode = defaults.WebHook.DesiredStatusCode
 	}
 
+	if w.Delay == "" {
+		w.Delay = defaults.WebHook.Delay.String()
+	}
+
 	if w.MaxTries == 0 {
 		w.MaxTries = defaults.WebHook.MaxTries
 	}
@@ -77,6 +83,22 @@ func (w *WebHook) setDefaults(defaults Defaults) {
 		w.SilentFails = "y"
 	} else {
 		w.SilentFails = "n"
+	}
+}
+
+// checkValues will check the variables for all of this services WebHook recipients.
+func (w *WebHookSlice) checkValues(serviceID string) {
+	for index := range *w {
+		(*w)[index].checkValues(serviceID, index)
+	}
+}
+
+// checkValues will check that the variables are valid for this WebHook recipient.
+func (w *WebHook) checkValues(serviceID string, index int) {
+	_, err := time.ParseDuration(w.Delay)
+	if err != nil {
+		fmt.Printf("ERROR: %s.webhook[%d].delay (%s) is invalid (Use 'AhBmCs' duration format)", serviceID, index, w.Delay)
+		os.Exit(1)
 	}
 }
 
@@ -116,6 +138,14 @@ func (w *WebHookSlice) send(serviceID string, mon *Monitor, slacks SlackSlice) {
 		go func() {
 			index := index                    // Create new instance for the goroutine.
 			triesLeft := (*w)[index].MaxTries // Number of times to send WebHook (until w.DesiredStatusCode received).
+
+			// Delay sending the Slack message by the defined interval.
+			sleepTime, _ := time.ParseDuration((*w)[index].Delay)
+			if *verbose && sleepTime != 0 {
+				log.Printf("VERBOSE: %s, Sleeping for %s before sending the WebHook", serviceID, (*w)[index].Delay)
+			}
+			time.Sleep(sleepTime)
+
 			for {
 				err := (*w)[index].send(serviceID)
 
@@ -202,7 +232,7 @@ func (w *WebHook) send(serviceID string) error {
 	// FAIL
 	body, _ := ioutil.ReadAll(resp.Body)
 
-	// Pretty desiredStatusCode
+	// Pretty desiredStatusCode.
 	desiredStatusCode := strconv.Itoa(w.DesiredStatusCode)
 	if desiredStatusCode == "0" {
 		desiredStatusCode = "2XX"

@@ -44,6 +44,8 @@ $ release_notifier -h
 Usage of /usr/local/bin/release_notifier:
   -config string
         The path to the config file to use (default "config.yml")
+  -debug
+        Toggle debug logging
   -verbose
         Toggle verbose logging
 ```
@@ -55,15 +57,18 @@ defaults:
   monitor:
     interval: 600
     access_token: 'GITHUB_ACCESS_TOKEN'
+    progressive_versioning: true
     allow_invalid: false
     ignore_misses: false
   slack:
     message: '<${monitor_url}|${monitor_id}> - ${version} released'
     username: 'Release Notifier'
     icon_url: 'https://github.githubassets.com/images/modules/logos_page/GitHub-Mark.png'
+    delay: 0s
     maxtries: 3
   webhook:
     desired_status_code: 0
+    delay: 1h2m3s
     maxtries: 3
     silent_fails: false
 services:
@@ -88,8 +93,9 @@ services:
       secret: SECRET_KEY
     slack:
       url: https://SLACK_INCOMING_WEBHOOK
+      delay: 5s
 ```
-Above, I set defaults.monitor.interval to 600 and then don't define an interval for the golang/go monitor. Therefore, this monitor will follow defaults.monitor.interval and query the site every 600 seconds. But, I can override that interval by stating it, for example in the adnanh/webhook monitor, I have set interval to 300 and so that page will be queried every 300 seconds.
+Above, I set defaults.monitor.interval to 600 and then don't define an interval for the golang/go monitor. Therefore, this monitor will follow defaults.monitor.interval and query the site every 600 seconds. But, I can override that interval by stating it, for example in the adnanh/webhook monitor, I have set interval to 300 and so that page will be queried every 300 seconds. The defaults.webhook.delay of 1h5m4s will delay sending the webhook by 1 hour, 2 minutes and 3 seconds when a version change is noticed. The CV-Site slack messages will be delayed by 5 seconds since the slack.delay overrides defaults.slack.delay.
 
 #### Defaults
 Defaults are not needed in the config, but you can override the coded defaults with your own defaults for Monitors, WebHooks and Slack messages in this defaults section. You could for example have a tiny defaults section that only has `defaults -> slack -> username: 'USERNAME'`, you do not need to define all values for a section. In the examples below, the values set are the coded defaults that will be used if they haven't been included in the service being monitored or the config defaults. (excluding access_token)
@@ -108,9 +114,11 @@ defaults:
     username: 'Release Notifier'
     icon_emoji: ':github:'
     icon_url: ''
+    delay: 0s
     maxtries: 3
   webhook:
     desired_status_code: 0
+    delay: 0s
     maxtries: 3
     silent_fails: false
 ```
@@ -121,7 +129,7 @@ defaults:
   monitor:
     interval: 600                       # Time between monitor queries.
     access_token: 'GITHUB_ACCESS_TOKEN' # Increase API rate limit with an access token (and allow querying private repos). Used when type="github".
-    progressive_versioning: true        # Only send Slack(s) and/or WebHook(s) when the version increases.
+    progressive_versioning: true        # Only send Slack(s) and/or WebHook(s) when the version increases (semantic versioning - e.g. v1.2.3a).
     allow_invalid: false                # Allow invalid HTTPS Certificates.
     ignore_misses: false                # Ignore url_command fails (e.g. split on text that doesn't exist)
 ```
@@ -134,6 +142,7 @@ defaults:
     username: 'Release Notifier'                                    # The user to message as.
     icon_emoji: ':github:'                                          # The emoji icon for that user.
     icon_url: ''                                                    # The URL of an icon for that user.
+    delay: 0s                                                       # The delay before sending messages.
     maxtries: 3                                                     # Number of times to resend until a 2XX status code is received.
 ```
 message - Each element of the monitor array can trigger a Slack message. This is the message that is sent when a change in version is noticed.
@@ -146,6 +155,7 @@ message - Each element of the monitor array can trigger a Slack message. This is
 defaults:
   webhook:
     desired_status_code: 0 # Status code indicating a success. Send maxtries # of times until we receive this. 0 = accept any 2XX code.
+    delay: 0s              # The delay before sending webhooks.
     maxtries: 3            # Number of times to resend until desired_status_code is received.
     silent_fails: false    # Whether to notify Slack if a webhook fails maxtries times
 ```
@@ -171,14 +181,18 @@ services:
         interval: 345
     slack:
       - url: https://SLACK_INCOMING_WEBHOOK
+        delay: 5h5m5m
       - url: https://OTHER_SLACK_INCOMING_WEBHOOK
+        delay: 1h1m1m
     webhook:
       - type: github
         url: https://AWX_HOSTNAME/api/v2/job_templates/35/github/
         secret: SECRET_KEY
+        delay: 5h5m5m
       - type: github
         url: https://OTHER_AWX_HOSTNAME/api/v2/job_templates/7/github/
         secret: OTHER_SECRET_KEY
+        delay: 1h5m5m
   - id: Gitea
     monitor:
       type: github
@@ -187,6 +201,7 @@ services:
       type: github
       url: https://AWX_HOSTNAME/api/v2/job_templates/36/github/
       secret: SECRET
+      delay: 5h5m5m
 ```
 This program can monitor multiple services. Just provide them in the standard yaml list format like above. It can also monitor multiple sites (if the same style Slack message(s) and webhook(s) are wanted), and can send multiple Slack messages and/or github style webhooks when a new release is found. Just turn the monitor, webhook and Slack sections into yaml lists. Note, if you don't have multiple Slack messages, multiple webhooks or multiple sites/repos under the same service, you don't have to format it as a list. This can be seen in the Gitea example above (they don't all need to be lists. e.g. you could have a list of monitors with a single webhook that isn't formatted as a list).
 
@@ -208,7 +223,7 @@ services:
           ignore_misses: false                             # Optional. Ignore fails (e.g. split on text that doesn't exist or no regex match)
       regex_content: "abc-[a-z]+-${version}_amd64.deb" # Optional. This regex must exist on the URL content to be classed as a new release.
       regex_version: '^v[0-9.]+$'                      # Optional. The version found must contain matching regex to be classed as a new release.
-      progressive_versioning: true                     # Optional. # Only send Slack(s) and/or WebHook(s) when the version increases.
+      progressive_versioning: true                     # Optional. # Only send Slack(s) and/or WebHook(s) when the version increases (semantic versioning - e.g. v1.2.3a).
       allow_invalid: false                             # Optional. Allow invalid HTTPS Certificates.
       access_token: 'GITHUB_ACCESS_TOKEN'              # Optional. GitHub access token to use. Allows smaller interval (higher API rate limit).
       skip_slack: false                                # Optional. Don't send Slack messages for new releases of this monitor.
@@ -248,6 +263,7 @@ services:
       username: 'Release Notifier'                                    # Optional. The user to message as.
       icon_emoji: ':github:'                                          # Optional. The emoji icon for that user.
       icon_url: ''                                                    # Optional. The URL of an icon for that user.
+      delay: '0s'                                                     # Optional. The duration (AhBmCs where h is hours, m is minutes and s is seconds) to delay sending the message by.
       maxtries: 3                                                     # Optional. The number of times to resend until a 2XX status code is received.
 ```
 The values of the optional arguments are the default values.
@@ -269,6 +285,7 @@ message:
       url: "WEBHOOK_URL"     # Required. The URL to send the WebHook to.
       secret: "SECRET"       # Required. The secret to send the WebHook with.
       desired_status_code: 0 # Optional. Keep sending the WebHooks until we recieve this status code (0 = accept any 2XX code).
+      delay: '0s'            # Optional. The duration (AhBmCs where h is hours, m is minutes and s is seconds) to delay sending the WebHook by.
       maxtries: 3            # Optional. Number of times to try re-sending WebHooks until we receive desired_status_code
       silent_fails: false    # Optional. Whether to send Slack messages to the Slacks of the Monitor when a WebHook fails maxtries times.
 ```

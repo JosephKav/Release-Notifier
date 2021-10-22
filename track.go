@@ -13,9 +13,9 @@ type ServiceSlice []Service
 // when a new release is found.
 type Service struct {
 	ID      string       `yaml:"id"`      // "SERVICE_NAME"
-	Monitor MonitorSlice `yaml:"monitor"` // The source(s) to monitor
-	WebHook WebHookSlice `yaml:"webhook"` // WebHook(s) to send on a new release
-	Slack   SlackSlice   `yaml:"slack"`   // Slack message(s) to send on a new release
+	Monitor MonitorSlice `yaml:"monitor"` // The source(s) to monitor.
+	WebHook WebHookSlice `yaml:"webhook"` // WebHook(s) to send on a new release.
+	Slack   SlackSlice   `yaml:"slack"`   // Slack message(s) to send on a new release.
 }
 
 // track will track each Monitor (in the MonitorSlice) in this ServiceSlice

@@ -12,6 +12,7 @@ import (
 	"io/ioutil"
 	"log"
 	"strings"
+	"time"
 
 	"gopkg.in/yaml.v3"
 )
@@ -45,18 +46,20 @@ type MonitorDefaults struct {
 
 // SlackDefaults are the defaults for Slack.
 type SlackDefaults struct {
-	IconEmoji string `yaml:"icon_emoji"` // Icon emoji to use for the Slack message.
-	IconURL   string `yaml:"icon_url"`   // Icon URL to use for the Slack message.
-	Username  string `yaml:"username"`   // Username to send the Slack message as.
-	Message   string `yaml:"message"`    // Slack message to send.
-	MaxTries  int    `yaml:"maxtries"`   // Number of times to attempt sending the Slack message until a 200 is received.
+	IconEmoji string        `yaml:"icon_emoji"` // Icon emoji to use for the Slack message.
+	IconURL   string        `yaml:"icon_url"`   // Icon URL to use for the Slack message.
+	Username  string        `yaml:"username"`   // Username to send the Slack message as.
+	Message   string        `yaml:"message"`    // Slack message to send.
+	Delay     time.Duration `yaml:"delay"`      // The delay before sending the Slack message.
+	MaxTries  int           `yaml:"maxtries"`   // Number of times to attempt sending the Slack message until a 200 is received.
 }
 
 // WebHookDefaults are the defaults for webhook.
 type WebHookDefaults struct {
-	DesiredStatusCode int    `yaml:"desired_status_code"` // Re-send each WebHook until we get this status code. (0 = accept all 2** codes)
-	MaxTries          int    `yaml:"maxtries"`            // Number of times to attempt sending the WebHook if the desired status code is not received.
-	SilentFails       string `yaml:"silent_fails"`        // Whether to notify if a WebHook fails MaxTries times
+	DesiredStatusCode int           `yaml:"desired_status_code"` // Re-send each WebHook until we get this status code. (0 = accept all 2** codes).
+	Delay             time.Duration `yaml:"delay"`               // The delay before sending the WebHook.
+	MaxTries          int           `yaml:"maxtries"`            // Number of times to attempt sending the WebHook if the desired status code is not received.
+	SilentFails       string        `yaml:"silent_fails"`        // Whether to notify if a WebHook fails MaxTries times.
 }
 
 // setDefaults will set the defaults for each undefined var.
@@ -129,10 +132,21 @@ func (c *Config) setDefaults() *Config {
 	for serviceIndex := range c.Services {
 		service := &c.Services[serviceIndex]
 		service.Monitor.setDefaults(c.Defaults)
+		service.Monitor.checkValues(service.ID)
 		service.Slack.setDefaults(c.Defaults)
+		service.Slack.checkValues(service.ID)
 		service.WebHook.setDefaults(c.Defaults)
+		service.WebHook.checkValues(service.ID)
 	}
 	return c
+}
+
+// valueOrDefault will return value if it's not empty, dflt otherwise.
+func valueOrDefault(value string, dflt string) string {
+	if value == "" {
+		return dflt
+	}
+	return value
 }
 
 // main loads the config and then calls Service.Track to monitor
