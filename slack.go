@@ -111,7 +111,7 @@ func (s *SlackSlice) send(serviceID string, mon *Monitor, message string) {
 			// Delay sending the Slack message by the defined interval.
 			sleepTime, _ := time.ParseDuration((*s)[index].Delay)
 			if *verbose && sleepTime != 0 {
-				log.Printf("INFO: %s, Sleeping for %s before sending the Slack message", serviceID, (*s)[index].Delay)
+				log.Printf("VERBOSE: %s, Sleeping for %s before sending the Slack message", serviceID, (*s)[index].Delay)
 			}
 			time.Sleep(sleepTime)
 
@@ -193,6 +193,9 @@ func (s *Slack) send(serviceID string, mon *Monitor, message string) error {
 
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
+		if *verbose {
+			log.Printf("ERROR: Slack\n%s", err)
+		}
 		return err
 	}
 	defer resp.Body.Close()

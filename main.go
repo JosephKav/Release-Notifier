@@ -160,7 +160,7 @@ func main() {
 	flag.Parse()
 
 	if *verbose {
-		log.Printf("INFO: Loading config from %s", *configFile)
+		log.Printf("VERBOSE: Loading config from %s", *configFile)
 	}
 	config.getConf(*configFile)
 	config.setDefaults()

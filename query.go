@@ -326,9 +326,7 @@ func (m *Monitor) query(i int) bool {
 		// Check for rate limit.
 		if len(body) < 500 {
 			if strings.Contains(body, "rate limit") {
-				if *verbose {
-					log.Printf("WARNING: Rate limit reached on %s", m.ID)
-				}
+				log.Printf("WARNING: Rate limit reached on %s", m.ID)
 				return false
 			}
 		}
@@ -473,7 +471,7 @@ func (m *Monitor) query(i int) bool {
 			if !regexMatch {
 				m.status.regexMissesContent++
 				if *verbose && m.status.regexMissesContent == 1 {
-					log.Printf("INFO: %s, Regex not matched on content for version %s", m.ID, version)
+					log.Printf("VERBOSE: %s, Regex not matched on content for version %s", m.ID, version)
 				}
 				return false
 			}
@@ -484,7 +482,7 @@ func (m *Monitor) query(i int) bool {
 			if !regexMatch {
 				m.status.regexMissesVersion++
 				if *verbose && m.status.regexMissesVersion == 1 {
-					log.Printf("INFO: %s, Regex not matched on version %s", m.ID, version)
+					log.Printf("VERBOSE: %s, Regex not matched on version %s", m.ID, version)
 				}
 				return false
 			}

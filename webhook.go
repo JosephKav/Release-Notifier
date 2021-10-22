@@ -214,10 +214,9 @@ func (w *WebHook) send(serviceID string) error {
 	defer cancel()
 
 	resp, err := http.DefaultClient.Do(req)
-
 	if err != nil {
 		if *verbose {
-			log.Printf("ERROR: WebHook %s", err)
+			log.Printf("ERROR: WebHook\n%s", err)
 		}
 		return err
 	}
