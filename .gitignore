@@ -14,5 +14,11 @@
 # Dependency directories (remove the comment below to include it)
 # vendor/
 
-# Output of go build -o release_notifier
+# Output of `go build -o release_notifier`
 release_notifier
+
+# Ignore personal config.yml's
+config.yml
+
+# Ignore example files
+*.example
