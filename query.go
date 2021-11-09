@@ -328,6 +328,14 @@ func (s *Service) query(index int, monitorID string) bool {
 	if s.Type == "github" {
 		// Check for rate limit.
 		if len(body) < 500 {
+			if !strings.Contains(body, `"tag_name"`) {
+				if strings.Contains(body, "Bad credentials") {
+					log.Println("ERROR: GitHub Access Token is invalid!")
+					os.Exit(1)
+				}
+				log.Printf("ERROR: tag_name not found for %s (%s) at %s\n%s", s.ID, monitorID, s.URL, body)
+				return false
+			}
 			if strings.Contains(body, "rate limit") {
 				log.Printf("WARNING: Rate limit reached on %s (%s)", s.ID, monitorID)
 				return false
