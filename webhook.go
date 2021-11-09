@@ -141,7 +141,7 @@ func (w *WebHookSlice) send(monitorID string, serviceID string, slacks SlackSlic
 
 			// Delay sending the Slack message by the defined interval.
 			sleepTime, _ := time.ParseDuration((*w)[index].Delay)
-			if sleepTime != 0 {
+			if sleepTime != 0 && *logLevel > 1 {
 				log.Printf("INFO: %s (%s), Sleeping for %s before sending the WebHook", serviceID, monitorID, (*w)[index].Delay)
 			}
 			time.Sleep(sleepTime)
@@ -158,8 +158,8 @@ func (w *WebHookSlice) send(monitorID string, serviceID string, slacks SlackSlic
 				triesLeft--
 				// Give up after MaxTries.
 				if triesLeft == 0 {
-					// If not verbose (this would already have been printed in verbose).
-					if !*verbose {
+					// If not verbose or above (above, this would already have been printed).
+					if *logLevel < 3 {
 						log.Printf("ERROR: %s (%s), %s", serviceID, monitorID, err)
 					}
 					message := fmt.Sprintf("%s, Failed %d times to send a WebHook to %s", monitorID, (*w)[index].MaxTries, (*w)[index].URL)
@@ -218,7 +218,8 @@ func (w *WebHook) send(monitorID string, serviceID string) error {
 
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
-		if *verbose {
+		// If verbose or above, print the error every time
+		if *logLevel > 2 {
 			log.Printf("ERROR: %s (%s), WebHook:\n%s", serviceID, monitorID, err)
 		}
 		return err
@@ -227,7 +228,9 @@ func (w *WebHook) send(monitorID string, serviceID string) error {
 
 	// SUCCESS
 	if resp.StatusCode == w.DesiredStatusCode || (w.DesiredStatusCode == 0 && (strconv.Itoa(resp.StatusCode)[:1] == "2")) {
-		log.Printf("INFO: %s (%s), (%d) WebHook received", serviceID, monitorID, resp.StatusCode)
+		if *logLevel > 1 {
+			log.Printf("INFO: %s (%s), (%d) WebHook received", serviceID, monitorID, resp.StatusCode)
+		}
 		return nil
 	}
 
@@ -240,8 +243,9 @@ func (w *WebHook) send(monitorID string, serviceID string) error {
 		desiredStatusCode = "2XX"
 	}
 
-	if *verbose {
+	// If verbose or above, print the error every time
+	if *logLevel > 2 {
 		log.Printf("ERROR:  %s (%s), WebHook didn't %s:\n%s\n%s", serviceID, monitorID, desiredStatusCode, resp.Status, body)
 	}
-	return fmt.Errorf("%s", resp.Status)
+	return fmt.Errorf("%s, %s", resp.Status, body)
 }

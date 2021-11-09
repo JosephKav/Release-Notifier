@@ -24,7 +24,7 @@ func (m *MonitorSlice) track() {
 	// Loop through each service.
 	for monitorIndex := range *m {
 		for serviceIndex := range (*m)[monitorIndex].Service {
-			if *verbose {
+			if *logLevel > 2 {
 				log.Printf("VERBOSE: Tracking %s at %s every %d seconds", (*m)[monitorIndex].Service[serviceIndex].ID, (*m)[monitorIndex].Service[serviceIndex].URL, (*m)[monitorIndex].Service[serviceIndex].Interval)
 			}
 

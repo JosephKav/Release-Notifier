@@ -18,8 +18,7 @@ import (
 )
 
 var (
-	verbose = flag.Bool("verbose", false, "Toggle verbose logging")
-	debug   = flag.Bool("debug", false, "Toggle debug logging")
+	logLevel = flag.Int("loglevel", 2, "0 = error, 1 = warn,\n2 = info,  3 = verbose,\n4 = debug")
 )
 
 // Config is the config for Release-Notifier.
@@ -159,8 +158,12 @@ func main() {
 	)
 
 	flag.Parse()
+	if *logLevel > 4 || *logLevel < 0 {
+		log.Println("ERROR: loglevel should be between 0 and 4 (inclusive), setting yours to 2 (info)")
+		*logLevel = 2
+	}
 
-	if *verbose {
+	if *logLevel > 2 {
 		log.Printf("VERBOSE: Loading config from '%s'", *configFile)
 	}
 	config.getConf(*configFile)
@@ -178,16 +181,18 @@ func main() {
 		log.Printf("ERROR: Exiting as no services to monitor were found in '%s'", *configFile)
 		os.Exit(1)
 	} else {
-		log.Printf("INFO: %d targets with %d services to monitor:", len(config.Monitor), serviceCount)
-	}
+		if *logLevel > 1 {
+			log.Printf("INFO: %d targets with %d services to monitor:", len(config.Monitor), serviceCount)
 
-	for _, monitor := range config.Monitor {
-		if len(monitor.Service) == 1 {
-			log.Printf("  - %s", monitor.Service[0].ID)
-		} else {
-			log.Printf("  - %s:", monitor.ID)
-			for _, service := range monitor.Service {
-				log.Printf("      - %s", service.ID)
+			for _, monitor := range config.Monitor {
+				if len(monitor.Service) == 1 {
+					log.Printf("  - %s", monitor.Service[0].ID)
+				} else {
+					log.Printf("  - %s:", monitor.ID)
+					for _, service := range monitor.Service {
+						log.Printf("      - %s", service.ID)
+					}
+				}
 			}
 		}
 	}

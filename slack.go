@@ -110,7 +110,7 @@ func (s *SlackSlice) send(monitorID string, svc *Service, message string) {
 
 			// Delay sending the Slack message by the defined interval.
 			sleepTime, _ := time.ParseDuration((*s)[index].Delay)
-			if sleepTime != 0 {
+			if sleepTime != 0 && *logLevel > 1 {
 				log.Printf("INFO: %s, Sleeping for %s before sending the Slack message", monitorID, (*s)[index].Delay)
 			}
 			time.Sleep(sleepTime)
@@ -129,8 +129,8 @@ func (s *SlackSlice) send(monitorID string, svc *Service, message string) {
 
 				// Give up after MaxTries.
 				if triesLeft == 0 {
-					// If not verbose (this would already have been printed in verbose).
-					if !*verbose {
+					// If not verbose or above (above, this would already have been printed).
+					if *logLevel < 3 {
 						log.Printf("ERROR: %s", err)
 					}
 					log.Printf("ERROR: %s (%s), Failed %d times to send a slack message to %s", svc.ID, monitorID, (*s)[index].MaxTries, (*s)[index].URL)
@@ -193,7 +193,8 @@ func (s *Slack) send(monitorID string, svc *Service, message string) error {
 
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
-		if *verbose {
+		// If verbose or above, print the error every time
+		if *logLevel > 2 {
 			log.Printf("ERROR: %s (%s), Slack\n%s", svc.ID, monitorID, err)
 		}
 		return err
@@ -202,13 +203,16 @@ func (s *Slack) send(monitorID string, svc *Service, message string) error {
 
 	// SUCCESS (2XX)
 	if strconv.Itoa(resp.StatusCode)[:1] == "2" {
-		log.Printf("INFO: %s (%s), Slack message sent", svc.ID, monitorID)
+		if *logLevel > 1 {
+			log.Printf("INFO: %s (%s), Slack message sent", svc.ID, monitorID)
+		}
 		return nil
 	}
 
 	// FAIL
 	body, _ := ioutil.ReadAll(resp.Body)
-	if *verbose {
+	// If verbose or above, print the error every time
+	if *logLevel > 2 {
 		log.Printf("ERROR: %s (%s), Slack request didn't 2XX\n%s\n%s", svc.ID, monitorID, resp.Status, body)
 	}
 	return fmt.Errorf("%s. %s", resp.Status, body)
