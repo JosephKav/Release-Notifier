@@ -86,18 +86,18 @@ func (w *WebHook) setDefaults(defaults Defaults) {
 	}
 }
 
-// checkValues will check the variables for all of this services WebHook recipients.
-func (w *WebHookSlice) checkValues(serviceID string) {
+// checkValues will check the variables for all of this Monitor's WebHook recipients.
+func (w *WebHookSlice) checkValues(monitorID string) {
 	for index := range *w {
-		(*w)[index].checkValues(serviceID, index)
+		(*w)[index].checkValues(monitorID, index)
 	}
 }
 
 // checkValues will check that the variables are valid for this WebHook recipient.
-func (w *WebHook) checkValues(serviceID string, index int) {
+func (w *WebHook) checkValues(monitorID string, index int) {
 	_, err := time.ParseDuration(w.Delay)
 	if err != nil {
-		fmt.Printf("ERROR: %s.webhook[%d].delay (%s) is invalid (Use 'AhBmCs' duration format)", serviceID, index, w.Delay)
+		fmt.Printf("ERROR: %s.webhook[%d].delay (%s) is invalid (Use 'AhBmCs' duration format)", monitorID, index, w.Delay)
 		os.Exit(1)
 	}
 }
@@ -133,7 +133,7 @@ func randAlphaNumericLower(n int) string {
 }
 
 // send will send every WebHook in this WebHookSlice with a delay between each webhook.
-func (w *WebHookSlice) send(serviceID string, mon *Monitor, slacks SlackSlice) {
+func (w *WebHookSlice) send(monitorID string, serviceID string, slacks SlackSlice) {
 	for index := range *w {
 		go func() {
 			index := index                    // Create new instance for the goroutine.
@@ -141,13 +141,13 @@ func (w *WebHookSlice) send(serviceID string, mon *Monitor, slacks SlackSlice) {
 
 			// Delay sending the Slack message by the defined interval.
 			sleepTime, _ := time.ParseDuration((*w)[index].Delay)
-			if *verbose && sleepTime != 0 {
-				log.Printf("VERBOSE: %s, Sleeping for %s before sending the WebHook", serviceID, (*w)[index].Delay)
+			if sleepTime != 0 {
+				log.Printf("INFO: %s (%s), Sleeping for %s before sending the WebHook", serviceID, monitorID, (*w)[index].Delay)
 			}
 			time.Sleep(sleepTime)
 
 			for {
-				err := (*w)[index].send(serviceID)
+				err := (*w)[index].send(monitorID, serviceID)
 
 				// SUCCESS!
 				if err == nil {
@@ -160,13 +160,16 @@ func (w *WebHookSlice) send(serviceID string, mon *Monitor, slacks SlackSlice) {
 				if triesLeft == 0 {
 					// If not verbose (this would already have been printed in verbose).
 					if !*verbose {
-						log.Printf("ERROR: %s", err)
+						log.Printf("ERROR: %s (%s), %s", serviceID, monitorID, err)
 					}
-					message := fmt.Sprintf("%s, Failed %d times to send a WebHook to %s", serviceID, (*w)[index].MaxTries, (*w)[index].URL)
+					message := fmt.Sprintf("%s, Failed %d times to send a WebHook to %s", monitorID, (*w)[index].MaxTries, (*w)[index].URL)
 					if (*w)[index].SilentFails == "n" {
-						slacks.send(serviceID, mon, message)
+						svc := Service{
+							ID: serviceID,
+						}
+						slacks.send(monitorID, &svc, message)
 					}
-					log.Printf("ERROR: %s", message)
+					log.Printf("ERROR: %s (%s), %s", serviceID, monitorID, message)
 					break
 				}
 				// Space out retries.
@@ -178,9 +181,9 @@ func (w *WebHookSlice) send(serviceID string, mon *Monitor, slacks SlackSlice) {
 	}
 }
 
-// send will send a WebHook to the WebHook URL with the body sha1 and sha256 encrypted with WebHook.Secret.
+// send will send a WebHook to the WebHook URL with the body SHA1 and SHA256 encrypted with WebHook.Secret.
 // It also simulates other GitHub headers and returns when an error is encountered.
-func (w *WebHook) send(serviceID string) error {
+func (w *WebHook) send(monitorID string, serviceID string) error {
 	// GitHub style payload.
 	payload, err := json.Marshal(WebHookGitHub{Ref: "refs/heads/master", Before: randAlphaNumericLower(40), After: randAlphaNumericLower(40)})
 	if err != nil {
@@ -216,7 +219,7 @@ func (w *WebHook) send(serviceID string) error {
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
 		if *verbose {
-			log.Printf("ERROR: WebHook\n%s", err)
+			log.Printf("ERROR: %s (%s), WebHook:\n%s", serviceID, monitorID, err)
 		}
 		return err
 	}
@@ -224,7 +227,7 @@ func (w *WebHook) send(serviceID string) error {
 
 	// SUCCESS
 	if resp.StatusCode == w.DesiredStatusCode || (w.DesiredStatusCode == 0 && (strconv.Itoa(resp.StatusCode)[:1] == "2")) {
-		log.Printf("INFO: %s, (%d) WebHook received", serviceID, resp.StatusCode)
+		log.Printf("INFO: %s (%s), (%d) WebHook received", serviceID, monitorID, resp.StatusCode)
 		return nil
 	}
 
@@ -238,7 +241,7 @@ func (w *WebHook) send(serviceID string) error {
 	}
 
 	if *verbose {
-		log.Printf("ERROR: WebHook didn't %s:\n%s\n%s", desiredStatusCode, resp.Status, body)
+		log.Printf("ERROR:  %s (%s), WebHook didn't %s:\n%s\n%s", serviceID, monitorID, desiredStatusCode, resp.Status, body)
 	}
 	return fmt.Errorf("%s", resp.Status)
 }

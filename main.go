@@ -8,9 +8,9 @@ package main
 
 import (
 	"flag"
-	"fmt"
 	"io/ioutil"
 	"log"
+	"os"
 	"strings"
 	"time"
 
@@ -25,18 +25,18 @@ var (
 // Config is the config for Release-Notifier.
 type Config struct {
 	Defaults Defaults     `yaml:"defaults"` // Default values for the various parameters.
-	Services ServiceSlice `yaml:"services"` // The services to monitor and notify.
+	Monitor  MonitorSlice `yaml:"monitor"`  // The targets to monitor and notify on.
 }
 
 // Defaults is the global default for vars.
 type Defaults struct {
-	Monitor MonitorDefaults `yaml:"monitor"`
+	Service ServiceDefaults `yaml:"service"`
 	Slack   SlackDefaults   `yaml:"slack"`
 	WebHook WebHookDefaults `yaml:"webhook"`
 }
 
-// MonitorDefaults are the defaults for Monitor.
-type MonitorDefaults struct {
+// ServiceDefaults are the defaults for Service.
+type ServiceDefaults struct {
 	AccessToken           string `yaml:"access_token"`           // GitHub access token.
 	AllowInvalidCerts     string `yaml:"allow_invalid"`          // Disallows invalid HTTPS certificates.
 	ProgressiveVersioning string `yaml:"progressive_versioning"` // Version has to be greater than the previous to trigger Slack(s)/WebHook(s)
@@ -64,29 +64,29 @@ type WebHookDefaults struct {
 
 // setDefaults will set the defaults for each undefined var.
 func (d *Defaults) setDefaults() {
-	// MonitorDefaults defaults.
-	if strings.ToLower(d.Monitor.AllowInvalidCerts) == "true" || strings.ToLower(d.Monitor.AllowInvalidCerts) == "yes" {
-		d.Monitor.AllowInvalidCerts = "y"
+	// ServiceDefaults defaults.
+	if strings.ToLower(d.Service.AllowInvalidCerts) == "true" || strings.ToLower(d.Service.AllowInvalidCerts) == "yes" {
+		d.Service.AllowInvalidCerts = "y"
 	} else {
-		d.Monitor.AllowInvalidCerts = "n"
+		d.Service.AllowInvalidCerts = "n"
 	}
-	if d.Monitor.Interval == 0 {
-		d.Monitor.Interval = 600
+	if d.Service.Interval == 0 {
+		d.Service.Interval = 600
 	}
-	if strings.ToLower(d.Monitor.ProgressiveVersioning) == "false" || strings.ToLower(d.Monitor.ProgressiveVersioning) == "no" {
-		d.Monitor.ProgressiveVersioning = "n"
+	if strings.ToLower(d.Service.ProgressiveVersioning) == "false" || strings.ToLower(d.Service.ProgressiveVersioning) == "no" {
+		d.Service.ProgressiveVersioning = "n"
 	} else {
-		d.Monitor.ProgressiveVersioning = "y"
+		d.Service.ProgressiveVersioning = "y"
 	}
-	if strings.ToLower(d.Monitor.IgnoreMiss) == "true" || strings.ToLower(d.Monitor.IgnoreMiss) == "yes" {
-		d.Monitor.IgnoreMiss = "y"
+	if strings.ToLower(d.Service.IgnoreMiss) == "true" || strings.ToLower(d.Service.IgnoreMiss) == "yes" {
+		d.Service.IgnoreMiss = "y"
 	} else {
-		d.Monitor.IgnoreMiss = "n"
+		d.Service.IgnoreMiss = "n"
 	}
 
 	// SlackDefaults defaults.
 	if d.Slack.Message == "" {
-		d.Slack.Message = "<${monitor_url}|${monitor_id}> - ${version} released"
+		d.Slack.Message = "<${service_url}|${service_id}> - ${version} released"
 	}
 	if d.Slack.Username == "" {
 		d.Slack.Username = "Release Notifier"
@@ -116,12 +116,12 @@ func (d *Defaults) setDefaults() {
 func (c *Config) getConf(file string) *Config {
 	data, err := ioutil.ReadFile(file)
 	if err != nil {
-		log.Printf("ERROR: data.Get err   #%v ", err)
+		log.Printf("ERROR: data.Get err\n%v ", err)
 	}
 
 	err = yaml.Unmarshal(data, c)
 	if err != nil {
-		log.Fatalf("ERROR: Unmarshal: %v", err)
+		log.Fatalf("ERROR: Unmarshal\n%v", err)
 	}
 	return c
 }
@@ -129,14 +129,14 @@ func (c *Config) getConf(file string) *Config {
 // setDefaults sets the defaults for each undefined var.
 func (c *Config) setDefaults() *Config {
 	c.Defaults.setDefaults()
-	for serviceIndex := range c.Services {
-		service := &c.Services[serviceIndex]
-		service.Monitor.setDefaults(c.Defaults)
-		service.Monitor.checkValues(service.ID)
-		service.Slack.setDefaults(c.Defaults)
-		service.Slack.checkValues(service.ID)
-		service.WebHook.setDefaults(c.Defaults)
-		service.WebHook.checkValues(service.ID)
+	for monitorIndex := range c.Monitor {
+		monitor := &c.Monitor[monitorIndex]
+		monitor.Service.setDefaults(c.Defaults)
+		monitor.Service.checkValues(monitor.ID)
+		monitor.Slack.setDefaults(c.Defaults)
+		monitor.Slack.checkValues(monitor.ID)
+		monitor.WebHook.setDefaults(c.Defaults)
+		monitor.WebHook.checkValues(monitor.ID)
 	}
 	return c
 }
@@ -149,8 +149,9 @@ func valueOrDefault(value string, dflt string) string {
 	return value
 }
 
-// main loads the config and then calls Service.Track to monitor
-// each Service for version changes and act on them as defined.
+// main loads the config and then calls Monitor.Track to monitor
+// each Service of the monitor targets for version changes and act
+// on them as defined.
 func main() {
 	var (
 		configFile = flag.String("config", "config.yml", "The path to the config file to use") // "path/to/config.yml"
@@ -160,26 +161,40 @@ func main() {
 	flag.Parse()
 
 	if *verbose {
-		log.Printf("VERBOSE: Loading config from %s", *configFile)
+		log.Printf("VERBOSE: Loading config from '%s'", *configFile)
 	}
 	config.getConf(*configFile)
 	config.setDefaults()
 
-	sites := ""
-	for sIndex, service := range config.Services {
-		for mIndex, monitor := range service.Monitor {
-			config.Services[sIndex].Monitor[mIndex].status.init()
-			sites = fmt.Sprintf("%s, %s", sites, monitor.ID)
+	serviceCount := 0
+	for mIndex, monitor := range config.Monitor {
+		serviceCount += len(monitor.Service)
+		for sIndex := range monitor.Service {
+			config.Monitor[mIndex].Service[sIndex].status.init()
 		}
 	}
-	log.Printf("INFO: %d sites to monitor:", strings.Count(sites, ","))
-	if len(sites) != 0 {
-		log.Printf("INFO: %s", sites[2:])
+
+	if serviceCount == 0 {
+		log.Printf("ERROR: Exiting as no services to monitor were found in '%s'", *configFile)
+		os.Exit(1)
+	} else {
+		log.Printf("INFO: %d targets with %d services to monitor:", len(config.Monitor), serviceCount)
 	}
 
-	// Trak all services for changes and act on any
+	for _, monitor := range config.Monitor {
+		if len(monitor.Service) == 1 {
+			log.Printf("  - %s", monitor.Service[0].ID)
+		} else {
+			log.Printf("  - %s:", monitor.ID)
+			for _, service := range monitor.Service {
+				log.Printf("      - %s", service.ID)
+			}
+		}
+	}
+
+	// Track all targets for changes in version and act on any
 	// found changes.
-	(&config).Services.track()
+	(&config).Monitor.track()
 
 	select {}
 }

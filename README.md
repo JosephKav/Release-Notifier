@@ -14,30 +14,58 @@ For example, you could set it to monitor the Gitea repo ([go-gitea/gitea](https:
       - [Example](#example)
       - [Defaults](#defaults)
         * [Example](#example-1)
-        * [Monitor](#defaults---monitor)
+        * [Service](#defaults---service)
         * [Slack](#defaults---slack)
         * [WebHook](#defaults---webhook)
-      - [Services](#services)
+      - [Monitor](#monitor)
         * [Example](#example-2)
-        * [Monitor](#services---monitor)
-        * [Slack](#services---slack)
-        * [WebHook](#services---webhook)
+        * [Service](#monitor---service)
+        * [Slack](#monitor---slack)
+        * [WebHook](#monitor---webhook)
 
 ## Output
-```bash
-$ release_notifier -config myConfig.yml
-2021/06/08 10:34:53 INFO: 5 sites to monitor:
-2021/06/08 10:34:53 INFO: ansible/awx-operator, go-gitea/gitea, grafana/grafana, mattermost/mattermost-server, prometheus/prometheus
-2021/06/08 10:34:54 INFO: ansible/awx-operator, Starting Release - 0.10.0
-2021/06/08 10:36:27 INFO: go-gitea/gitea, Starting Release - v1.14.2
-2021/06/08 10:36:42 INFO: grafana/grafana, Starting Release - v8.0.0
-2021/06/08 10:36:52 INFO: mattermost/mattermost-server, Starting Release - 5.35.2
-2021/06/08 10:37:08 INFO: prometheus/prometheus, Starting Release - v2.27.1
-2021/06/10 16:13:49 INFO: grafana/grafana, New Release - v8.0.1
-2021/06/10 16:13:49 INFO: Grafana, Slack message sent
-2021/06/10 16:13:50 INFO: Grafana, WebHook received (202)
-```
 ![image](https://user-images.githubusercontent.com/4267227/138481247-cbee6073-bf6c-4be2-8b2e-875f3719e738.png)
+```bash
+$ release_notifier -config myConfig.yml -verbose
+2021/11/08 02:18:24 VERBOSE: Loading config from 'config.yml'
+2021/11/08 02:18:24 INFO: 4 targets with 5 services to monitor:
+2021/11/08 02:18:24   - Authentik:
+2021/11/08 02:18:24       - goauthentik/authentik
+2021/11/08 02:18:24   - AWX:
+2021/11/08 02:18:24       - ansible/awx-operator
+2021/11/08 02:18:24   - CV-Site:
+2021/11/08 02:18:24       - gohugoio/hugo
+2021/11/08 02:18:24       - adnanh/webhook
+2021/11/08 02:18:24   - louislam/uptime-kuma:
+2021/11/08 02:18:24       - louislam/uptime-kuma
+2021/11/08 02:18:24 VERBOSE: Tracking goauthentik/authentik at https://api.github.com/repos/goauthentik/authentik/releases/latest every 600 seconds
+2021/11/08 02:18:24 INFO: goauthentik/authentik (Authentik), Starting Release - 2021.10.2
+2021/11/08 02:18:35 VERBOSE: Tracking ansible/awx-operator at https://api.github.com/repos/ansible/awx-operator/releases/latest every 600 seconds
+2021/11/08 02:18:35 INFO: ansible/awx-operator (AWX), Starting Release - 0.14.0
+2021/11/08 02:18:52 VERBOSE: Tracking gohugoio/hugo at https://api.github.com/repos/gohugoio/hugo/releases/latest every 600 seconds
+2021/11/08 02:18:52 INFO: gohugoio/hugo (CV-Site), Starting Release - 0.89.1
+2021/11/08 02:19:09 VERBOSE: Tracking adnanh/webhook at https://api.github.com/repos/adnanh/webhook/releases/latest every 600 seconds
+2021/11/08 02:19:09 INFO: adnanh/webhook (CV-Site), Starting Release - 2.8.0
+2021/11/08 02:19:28 VERBOSE: Tracking louislam/uptime-kuma at https://api.github.com/repos/louislam/uptime-kuma/releases/latest every 600 seconds
+2021/11/08 02:19:28 INFO: louislam/uptime-kuma (louislam/uptime-kuma), Starting Release - 1.10.0
+2021/11/08 10:11:58 INFO: louislam/uptime-kuma (louislam/uptime-kuma), New Release - 1.10.1
+2021/11/08 10:11:58 INFO: louislam/uptime-kuma (louislam/uptime-kuma), Slack message sent
+2021/11/08 10:11:59 INFO: louislam/uptime-kuma (louislam/uptime-kuma), (202) WebHook received
+2021/11/08 16:09:35 INFO: gohugoio/hugo (CV-Site), New Release - 0.89.2
+2021/11/08 16:09:35 INFO: gohugoio/hugo (CV-Site), Slack message sent
+2021/11/08 16:09:40 ERROR: gohugoio/hugo (CV-Site), WebHook
+Post "https://awx.example.io/api/v2/job_templates/30/github/": context deadline exceeded
+2021/11/08 16:09:50 INFO: gohugoio/hugo (CV-Site), (202) WebHook received
+2021/11/08 20:08:52 INFO: goauthentik/authentik (Authentik), New Release - 2021.10.3
+2021/11/08 20:08:52 INFO: goauthentik/authentik (Authentik), Sleeping for 2h before sending the WebHook
+2021/11/08 20:08:52 INFO: goauthentik/authentik (Authentik), Slack message sent
+2021/11/08 22:08:57 ERROR: goauthentik/authentik (Authentik), WebHook
+Post "https://awx.example.io/api/v2/job_templates/40/github/": context deadline exceeded
+2021/11/08 22:09:07 INFO: goauthentik/authentik (Authentik), (202) WebHook received
+2021/11/09 14:52:40 INFO: louislam/uptime-kuma (louislam/uptime-kuma), New Release - 1.10.2
+2021/11/09 14:52:40 INFO: louislam/uptime-kuma (louislam/uptime-kuma), Slack message sent
+2021/11/09 14:52:41 INFO: louislam/uptime-kuma (louislam/uptime-kuma), (202) WebHook received
+```
 
 ## Command-line arguments
 ```bash
@@ -55,14 +83,14 @@ Usage of /usr/local/bin/release_notifier:
 #### Example
 ```yaml
 defaults:
-  monitor:
+  service:
     interval: 600
     access_token: 'GITHUB_ACCESS_TOKEN'
     progressive_versioning: true
     allow_invalid: false
     ignore_misses: false
   slack:
-    message: '<${monitor_url}|${monitor_id}> - ${version} released'
+    message: '<${service_url}|${service_id}> - ${version} released'
     username: 'Release Notifier'
     icon_url: 'https://github.githubassets.com/images/modules/logos_page/GitHub-Mark.png'
     delay: 0s
@@ -72,9 +100,9 @@ defaults:
     delay: 1h2m3s
     maxtries: 3
     silent_fails: false
-services:
+monitor:
   - id: CV-Site
-    monitor:
+    service:
       - id: golang/go
         type: url
         url: https://github.com/golang/go/releases
@@ -96,22 +124,22 @@ services:
       url: https://SLACK_INCOMING_WEBHOOK
       delay: 5s
 ```
-Above, I set defaults.monitor.interval to 600 and then don't define an interval for the golang/go monitor. Therefore, this monitor will follow defaults.monitor.interval and query the site every 600 seconds. But, I can override that interval by stating it, for example in the adnanh/webhook monitor, I have set interval to 300 and so that page will be queried every 300 seconds. The defaults.webhook.delay of 1h5m4s will delay sending the webhook by 1 hour, 2 minutes and 3 seconds when a version change is noticed. The CV-Site slack messages will be delayed by 5 seconds since the slack.delay overrides defaults.slack.delay.
+Above, I set defaults.service.interval to 600 and then don't define an interval for the golang/go service. Therefore, the monitor for this service will follow defaults.service.interval and query the site every 600 seconds. But, I can override that interval by stating it, for example in the adnanh/webhook service, I have set interval to 300 and so that page will be queried every 300 seconds. The defaults.webhook.delay of 1h5m4s will delay sending the webhook by 1 hour, 2 minutes and 3 seconds when a version change is noticed. The CV-Site slack messages will be delayed by 5 seconds since the slack.delay overrides defaults.slack.delay.
 
 #### Defaults
-Defaults are not needed in the config, but you can override the coded defaults with your own defaults for Monitors, WebHooks and Slack messages in this defaults section. You could for example have a tiny defaults section that only has `defaults -> slack -> username: 'USERNAME'`, you do not need to define all values for a section. In the examples below, the values set are the coded defaults that will be used if they haven't been included in the service being monitored or the config defaults. (excluding access_token)
+Defaults are not needed in the config, but you can override the coded defaults with your own defaults for service, webhook and slack in this defaults section. You could for example have a tiny defaults section that only has `defaults -> slack -> username: 'USERNAME'`, you do not need to define all values for a section. In the examples below, the values set are the coded defaults that will be used if they haven't been included in the service being monitored or the config defaults. (excluding access_token)
 
 ##### Example
 ```yaml
 defaults:
-  monitor:
+  service:
     interval: 600
     access_token: 'GITHUB_ACCESS_TOKEN'
     progressive_versioning: true
     allow_invalid: false
     ignore_misses: false
   slack:
-    message: '<${monitor_url}|${monitor_id}> - ${version} released'
+    message: '<${service_url}|${service_id}> - ${version} released'
     username: 'Release Notifier'
     icon_emoji: ':github:'
     icon_url: ''
@@ -127,7 +155,7 @@ defaults:
 ##### Defaults - Monitor
 ```yaml
 defaults:
-  monitor:
+  service:
     interval: 600                       # Time between monitor queries.
     access_token: 'GITHUB_ACCESS_TOKEN' # Increase API rate limit with an access token (and allow querying private repos). Used when type="github".
     progressive_versioning: true        # Only send Slack(s) and/or WebHook(s) when the version increases (semantic versioning - e.g. v1.2.3a).
@@ -139,17 +167,20 @@ defaults:
 ```yaml
 defaults:
   slack:
-    message: '<${monitor_url}|${monitor_id}> - ${version} released' # Formatting of the message to send.
+    message: '<${service_url}|${service_id}> - ${version} released' # Formatting of the message to send.
     username: 'Release Notifier'                                    # The user to message as.
     icon_emoji: ':github:'                                          # The emoji icon for that user.
     icon_url: ''                                                    # The URL of an icon for that user.
     delay: 0s                                                       # The delay before sending messages.
     maxtries: 3                                                     # Number of times to resend until a 2XX status code is received.
 ```
-message - Each element of the monitor array can trigger a Slack message. This is the message that is sent when a change in version is noticed.
-- `${monitor}` will be replaced with the id given to the monitor element that has changed version and that text will link to the url of that monitor element.
-- `${version}` will be replaced with the version that was found (e.g. `${version} = 10.6.3`).
-- `${service}` will be replaced with the id of the monitor element triggering the message.
+message - Each element of the service array of a monitor element will trigger a Slack message to the slack's of the parent monitor unless service.skip_slack is True. This is the message that is sent when a change in version is noticed.
+- `${service_id}`  will be replaced with the ID.
+- `${service_url}` will be replaced with the URL
+- `${version}`     will be replaced with the version that was found (e.g. `${version} = 10.6.3`).
+- `${monitor_id}`  will be replaced with the ID given to the parent (monitor element).
+
+(of the service element that is triggering the message)
 
 ##### Defaults - WebHook
 ```yaml
@@ -161,12 +192,12 @@ defaults:
     silent_fails: false    # Whether to notify Slack if a webhook fails maxtries times
 ```
 
-#### Services
+#### Monitor
 ##### Example
 ```yaml
-services:
+monitor:
   - id: CV-Site
-    monitor:
+    service:
       - id: golang/go
         type: url
         url: https://github.com/golang/go/releases
@@ -195,7 +226,7 @@ services:
         secret: OTHER_SECRET_KEY
         delay: 1h5m5m
   - id: Gitea
-    monitor:
+    service:
       type: github
       url: go-gitea/gitea
     webhook:
@@ -204,13 +235,13 @@ services:
       secret: SECRET
       delay: 5h5m5m
 ```
-This program can monitor multiple services. Just provide them in the standard yaml list format like above. It can also monitor multiple sites (if the same style Slack message(s) and webhook(s) are wanted), and can send multiple Slack messages and/or github style webhooks when a new release is found. Just turn the monitor, webhook and Slack sections into yaml lists. Note, if you don't have multiple Slack messages, multiple webhooks or multiple sites/repos under the same service, you don't have to format it as a list. This can be seen in the Gitea example above (they don't all need to be lists. e.g. you could have a list of monitors with a single webhook that isn't formatted as a list).
+This program can monitor multiple services. Just provide them in the standard yaml list format like above. It can also monitor multiple sites under the same monitor element (if the same style Slack message(s) and webhook(s) are wanted), and can send multiple slack messages and/or github style webhooks when a new release is found. Just turn the monitor, webhook and slack sections into yaml lists. Note, if you don't have multiple slack messages, multiple webhooks or multiple sites/repos under the same service, you don't have to format it as a list. This can be seen in the Gitea example above (they don't all need to be lists. e.g. you could have a list of monitors with a single webhook that isn't formatted as a list).
 
-##### Services - Monitor
+##### Monitor - Service
 ```yaml
-services:
-  - id: "PRETTY_SERVICE_NAME" # Optional. Replaces ${service} in Slack messages.
-    monitor:                  # Required.
+monitor:
+  - id: "PRETTY_MONITOR_NAME" # Optional. Replaces ${monitor_id} in Slack messages.
+    service:                  # Required.
       id: "PRETTY NAME"                                # Optional. Used in logs/Slack messages.
       type: "github"|"url"                             # Optional. If unset, ill be set to github if only one / is present, otherwise url.
       url: GITHUB_OWNER/REPO                           # Required. URL/Repo to monitor. "OWNER/REPO" if type="github" | "URL_TO_MONITOR" if type="url"
@@ -227,8 +258,8 @@ services:
       progressive_versioning: true                     # Optional. # Only send Slack(s) and/or WebHook(s) when the version increases (semantic versioning - e.g. v1.2.3a).
       allow_invalid: false                             # Optional. Allow invalid HTTPS Certificates.
       access_token: 'GITHUB_ACCESS_TOKEN'              # Optional. GitHub access token to use. Allows smaller interval (higher API rate limit).
-      skip_slack: false                                # Optional. Don't send Slack messages for new releases of this monitor.
-      skip_webhook: false                              # Optional. Don't send WebHooks for new releases of this monitor.
+      skip_slack: false                                # Optional. Don't send Slack messages for new releases of this service.
+      skip_webhook: false                              # Optional. Don't send WebHooks for new releases of this service.
       interval: 600                                    # Optional. Amount of seconds to sleep between querying the URL for the version.
 ```
 The values of the optional boolean arguments are the default values.
@@ -252,15 +283,15 @@ url_commands:
   - replace:
     - This will replace `old` with `new` in the URL content at this point.
 
-##### Services - Slack
+##### Monitor - Slack
 ```yaml
-services:
-  - id: "PRETTY_SERVICE_NAME" # Optional. Replaces ${service} in Slack messages.
-    monitor:                  # Required.
+monitor:
+  - id: "PRETTY_SERVICE_NAME" # Optional. Replaces ${monitor_id} in Slack messages.
+    service:                  # Required.
       ....
     slack:                    # Optional.
       url: "SLACK_INCOMING_WEBHOOK"                                   # Required. The URL of the incoming Slack WebHook to send the message to.
-      message: '<${monitor_url}|${monitor_id}> - ${version} released' # Optional. Formatting of the message to send.
+      message: '<${service_url}|${service_id}> - ${version} released' # Optional. Formatting of the message to send.
       username: 'Release Notifier'                                    # Optional. The user to message as.
       icon_emoji: ':github:'                                          # Optional. The emoji icon for that user.
       icon_url: ''                                                    # Optional. The URL of an icon for that user.
@@ -270,16 +301,17 @@ services:
 The values of the optional arguments are the default values.
 
 message:
-- `${monitor}` will be replaced with the id given to the monitor element that has changed version and that text will link to the url of that monitor element.
-- `${version}` will be replaced with the version that was found (e.g. `${version} = 10.6.3`).
-- `${service}` will be replaced with the id of the monitor element triggering the message.
+- `${service_id}`  will be replaced with the ID.
+- `${service_url}` will be replaced with the URL
+- `${version}`     will be replaced with the version that was found (e.g. `${version} = 10.6.3`).
+- `${monitor_id}`  will be replaced with the ID given to the parent (monitor element).
 
-(of the monitor element that is triggering the message)
+(of the service element that is triggering the message)
 
-##### Services - WebHook
+##### Monitor - WebHook
 ```yaml
   - id: "PRETTY_SERVICE_NAME" # Optional. Replaces ${service} in Slack messages.
-    monitor:                  # Required.
+    service:                  # Required.
       ...
     webhook:                  # Optional.
       type: "github"         # Required. The type of WebHook to send (Currently only github is supported).

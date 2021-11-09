@@ -23,7 +23,7 @@ type Slack struct {
 	IconEmoji string `yaml:"icon_emoji"` // ":github:"
 	IconURL   string `yaml:"icon_url"`   // "https://github.githubassets.com/images/modules/logos_page/GitHub-Mark.png"
 	Username  string `yaml:"username"`   // "Release Notifier"
-	Message   string `yaml:"message"`    // "${monitor} - ${version} released"
+	Message   string `yaml:"message"`    // "${service} - ${version} released"
 	Delay     string `yaml:"delay"`      // The delay before sending the Slack message.
 	MaxTries  int    `yaml:"maxtries"`   // Number of times to attempt sending the Slack message if a 200 is not received.
 }
@@ -76,18 +76,18 @@ func (s *Slack) setDefaults(defaults Defaults) {
 	}
 }
 
-// checkValues will check the variables for all of this services Slack recipients.
-func (s *SlackSlice) checkValues(serviceID string) {
+// checkValues will check the variables for all of this monitors Slack recipients.
+func (s *SlackSlice) checkValues(monitorID string) {
 	for index := range *s {
-		(*s)[index].checkValues(serviceID, index)
+		(*s)[index].checkValues(monitorID, index)
 	}
 }
 
 // checkValues will check that the variables are valid for this Slack recipient.
-func (s *Slack) checkValues(serviceID string, index int) {
+func (s *Slack) checkValues(monitorID string, index int) {
 	_, err := time.ParseDuration(s.Delay)
 	if err != nil {
-		fmt.Printf("ERROR: %s.slack[%d].delay (%s) is invalid (Use 'AhBmCs' duration format)", serviceID, index, s.Delay)
+		fmt.Printf("ERROR: %s.slack[%d].delay (%s) is invalid (Use 'AhBmCs' duration format)", monitorID, index, s.Delay)
 		os.Exit(1)
 	}
 }
@@ -97,11 +97,11 @@ type SlackPayload struct {
 	Username  string `json:"username"`   // "Release Notifier"
 	IconEmoji string `json:"icon_emoji"` // ":github:"
 	IconURL   string `json:"icon_url"`   // "https://github.githubassets.com/images/modules/logos_page/GitHub-Mark.png"
-	Text      string `json:"text"`       // "${monitor} - ${version} released"
+	Text      string `json:"text"`       // "${service} - ${version} released"
 }
 
 // send will send every slack message in this SlackSlice.
-func (s *SlackSlice) send(serviceID string, mon *Monitor, message string) {
+func (s *SlackSlice) send(monitorID string, svc *Service, message string) {
 	for index := range *s {
 		// Send each Slack message up to s.MaxTries number of times until they 200.
 		go func() {
@@ -110,19 +110,19 @@ func (s *SlackSlice) send(serviceID string, mon *Monitor, message string) {
 
 			// Delay sending the Slack message by the defined interval.
 			sleepTime, _ := time.ParseDuration((*s)[index].Delay)
-			if *verbose && sleepTime != 0 {
-				log.Printf("VERBOSE: %s, Sleeping for %s before sending the Slack message", serviceID, (*s)[index].Delay)
+			if sleepTime != 0 {
+				log.Printf("INFO: %s, Sleeping for %s before sending the Slack message", monitorID, (*s)[index].Delay)
 			}
 			time.Sleep(sleepTime)
 
 			for {
-				err := (*s)[index].send(serviceID, mon, message)
+				err := (*s)[index].send(monitorID, svc, message)
 
 				// SUCCESS
 				if err == nil {
 					return
 				}
-				log.Printf("ERROR: Sending Slack failed.\n%v", err)
+				log.Printf("ERROR: %s (%s), Sending Slack failed.\n%v", svc.ID, monitorID, err)
 
 				// FAIL
 				triesLeft--
@@ -133,7 +133,7 @@ func (s *SlackSlice) send(serviceID string, mon *Monitor, message string) {
 					if !*verbose {
 						log.Printf("ERROR: %s", err)
 					}
-					log.Printf("ERROR: %s, Failed %d times to send a slack message to %s", serviceID, (*s)[index].MaxTries, (*s)[index].URL)
+					log.Printf("ERROR: %s (%s), Failed %d times to send a slack message to %s", svc.ID, monitorID, (*s)[index].MaxTries, (*s)[index].URL)
 					return
 				}
 
@@ -147,33 +147,33 @@ func (s *SlackSlice) send(serviceID string, mon *Monitor, message string) {
 }
 
 // send sends a formatted Slack notification regarding mon.
-func (s *Slack) send(serviceID string, mon *Monitor, message string) error {
-	mURL := mon.URL
+func (s *Slack) send(monitorID string, svc *Service, message string) error {
+	sURL := svc.URL
 	// GitHub monitor. Get the non-API URL.
-	if mon.Type == "github" {
-		mURL = strings.Split(mon.URL, "github.com/repos/")[1]
-		mURL = fmt.Sprintf("https://github.com/%s/%s", strings.Split(mURL, "/")[0], strings.Split(mURL, "/")[1])
+	if svc.Type == "github" {
+		sURL = strings.Split(svc.URL, "github.com/repos/")[1]
+		sURL = fmt.Sprintf("https://github.com/%s/%s", strings.Split(sURL, "/")[0], strings.Split(sURL, "/")[1])
 	}
 
 	// Use 'new release' Slack message (Not a custom message)
 	if message == "" {
-		message = valueOrDefault(mon.Slack.Message, s.Message)
-		message = strings.ReplaceAll(message, "${service}", serviceID)
-		message = strings.ReplaceAll(message, "${monitor_url}", mURL)
-		message = strings.ReplaceAll(message, "${monitor_id}", mon.ID)
-		message = strings.ReplaceAll(message, "${version}", mon.status.version)
+		message = valueOrDefault(svc.Slack.Message, s.Message)
+		message = strings.ReplaceAll(message, "${monitor_id}", monitorID)
+		message = strings.ReplaceAll(message, "${service_url}", sURL)
+		message = strings.ReplaceAll(message, "${service_id}", svc.ID)
+		message = strings.ReplaceAll(message, "${version}", svc.status.version)
 	}
 
 	payload := SlackPayload{
-		Username:  valueOrDefault(mon.Slack.Username, s.Username),
-		IconEmoji: valueOrDefault(mon.Slack.IconEmoji, s.IconEmoji),
-		IconURL:   valueOrDefault(mon.Slack.IconURL, s.IconURL),
+		Username:  valueOrDefault(svc.Slack.Username, s.Username),
+		IconEmoji: valueOrDefault(svc.Slack.IconEmoji, s.IconEmoji),
+		IconURL:   valueOrDefault(svc.Slack.IconURL, s.IconURL),
 		Text:      message,
 	}
 	// Handle per-monitor overrides. (Ensure s.Icon* values won't be sent)
-	if mon.Slack.IconEmoji != "" {
+	if svc.Slack.IconEmoji != "" {
 		payload.IconURL = ""
-	} else if mon.Slack.IconURL != "" {
+	} else if svc.Slack.IconURL != "" {
 		payload.IconEmoji = ""
 	}
 
@@ -194,7 +194,7 @@ func (s *Slack) send(serviceID string, mon *Monitor, message string) error {
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
 		if *verbose {
-			log.Printf("ERROR: Slack\n%s", err)
+			log.Printf("ERROR: %s (%s), Slack\n%s", svc.ID, monitorID, err)
 		}
 		return err
 	}
@@ -202,14 +202,14 @@ func (s *Slack) send(serviceID string, mon *Monitor, message string) error {
 
 	// SUCCESS (2XX)
 	if strconv.Itoa(resp.StatusCode)[:1] == "2" {
-		log.Printf("INFO: %s, Slack message sent", serviceID)
+		log.Printf("INFO: %s (%s), Slack message sent", svc.ID, monitorID)
 		return nil
 	}
 
 	// FAIL
 	body, _ := ioutil.ReadAll(resp.Body)
 	if *verbose {
-		log.Printf("ERROR: Slack request didn't 2XX:\n%s\n%s", resp.Status, body)
+		log.Printf("ERROR: %s (%s), Slack request didn't 2XX\n%s\n%s", svc.ID, monitorID, resp.Status, body)
 	}
 	return fmt.Errorf("%s. %s", resp.Status, body)
 }

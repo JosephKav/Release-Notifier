@@ -1,9 +1,9 @@
 defaults:
-  monitor:
+  service:
     interval: 600
     access_token: ghp_AAAA
   slack:
-    message: '<${monitor_url}|${monitor_id}> - ${version} released'
+    message: '<${service_url}|${service_id}> - ${version} released'
     username: 'Release Notifier'
     icon_emoji: ':github_background:'
     maxtries: 3
@@ -13,9 +13,9 @@ defaults:
     maxtries: 3
     delay: 0s
     silent_fails: false
-services:
+monitor:
   - id: Gitea
-    monitor:
+    service:
       type: github
       url: go-gitea/gitea
       url_commands: # Remove the v for progressive versioning

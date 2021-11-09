@@ -14,12 +14,12 @@ import (
 	"github.com/coreos/go-semver/semver"
 )
 
-// MonitorSlice is an array of Monitor.
-type MonitorSlice []Monitor
+// ServiceSlice is an array of Service.
+type ServiceSlice []Service
 
-// Monitor is a source to be monitored and provides everything needed to extract
+// Service is a source to be serviceed and provides everything needed to extract
 // the latest version from the URL provided.
-type Monitor struct {
+type Service struct {
 	ID                    string          `yaml:"id"`
 	Type                  string          `yaml:"type"`                   // "github"/"URL"
 	URL                   string          `yaml:"url"`                    // type:URL - "https://example.com", type:github - "owner/repo" or "https://github.com/owner/repo".
@@ -38,23 +38,23 @@ type Monitor struct {
 
 // UnmarshalYAML allows handling of a dict as well as a list of dicts.
 //
-// It will convert a dict to a list of a dict.
+// It will convert a dict to a list of dict's.
 //
-// e.g.    MonitorSlice: { URL: "example.com" }
+// e.g.    ServiceSlice: { URL: "example.com" }
 //
-// becomes MonitorSlice: [ { URL: "example.com" } ]
-func (m *MonitorSlice) UnmarshalYAML(unmarshal func(interface{}) error) error {
-	var multi []Monitor
+// becomes ServiceSlice: [ { URL: "example.com" } ]
+func (s *ServiceSlice) UnmarshalYAML(unmarshal func(interface{}) error) error {
+	var multi []Service
 	err := unmarshal(&multi)
 	if err != nil {
-		var single Monitor
+		var single Service
 		err := unmarshal(&single)
 		if err != nil {
 			return err
 		}
-		*m = []Monitor{single}
+		*s = []Service{single}
 	} else {
-		*m = multi
+		*s = multi
 	}
 	return nil
 }
@@ -97,138 +97,138 @@ type URLCommand struct {
 }
 
 // checkValues will check the variables for all of this services Slack recipients.
-func (m *MonitorSlice) checkValues(serviceID string) {
-	for index := range *m {
-		(*m)[index].checkValues(serviceID, index)
+func (s *ServiceSlice) checkValues(serviceID string) {
+	for index := range *s {
+		(*s)[index].checkValues(serviceID, index)
 	}
 }
 
 // checkValues will check that the variables are valid for this Slack recipient.
-func (m *Monitor) checkValues(serviceID string, index int) {
-	if m.Slack.Delay != "" {
-		_, err := time.ParseDuration(m.Slack.Delay)
+func (s *Service) checkValues(serviceID string, index int) {
+	if s.Slack.Delay != "" {
+		_, err := time.ParseDuration(s.Slack.Delay)
 		if err != nil {
-			fmt.Printf("ERROR: %s.slack[%d].delay (%s) is invalid (Use 'AhBmCs' duration format)", serviceID, index, m.Slack.Delay)
+			fmt.Printf("ERROR: %s.slack[%d].delay (%s) is invalid (Use 'AhBmCs' duration format)", serviceID, index, s.Slack.Delay)
 			os.Exit(1)
 		}
 	}
 }
 
-// status is the current state of the Monitor element (version and regex misses).
+// status is the current state of the Service element (version and regex misses).
 type status struct {
 	version            string // Latest version found from query().
 	regexMissesContent int    // Counter for the number of regex misses on URL content.
 	regexMissesVersion int    // Counter for the number of regex misses on version.
-	monitorMisses      string // "1000" 1 = miss, 0 = no miss for split etc.
+	serviceMisses      string // "1000" 1 = miss, 0 = no miss for split etc.
 }
 
-// setDefaults sets the defaults for undefined Monitor values using defaults.
+// setDefaults sets the defaults for undefined Service values using defaults.
 func (s *status) init() {
-	s.monitorMisses = "0000"
+	s.serviceMisses = "0000"
 }
 
-// setDefaults sets the defaults for undefined Monitor values using defaults.
-func (m *MonitorSlice) setDefaults(defaults Defaults) {
-	for index := range *m {
-		(*m)[index].setDefaults(defaults)
+// setDefaults sets the defaults for undefined Service values using defaults.
+func (s *ServiceSlice) setDefaults(defaults Defaults) {
+	for index := range *s {
+		(*s)[index].setDefaults(defaults)
 	}
 }
 
 // setDefaults sets the defaults for each undefined var using defaults.
-func (m *Monitor) setDefaults(defaults Defaults) {
+func (s *Service) setDefaults(defaults Defaults) {
 	// Default GitHub Access Token.
-	if m.AccessToken == "" {
-		m.AccessToken = defaults.Monitor.AccessToken
+	if s.AccessToken == "" {
+		s.AccessToken = defaults.Service.AccessToken
 	}
 
 	// Default allowance/rejection of invalid certs.
-	if m.AllowInvalidCerts == "" {
-		m.AllowInvalidCerts = defaults.Monitor.AllowInvalidCerts
-	} else if strings.ToLower(m.AllowInvalidCerts) == "true" || strings.ToLower(m.AllowInvalidCerts) == "yes" {
-		m.AllowInvalidCerts = "y"
+	if s.AllowInvalidCerts == "" {
+		s.AllowInvalidCerts = defaults.Service.AllowInvalidCerts
+	} else if strings.ToLower(s.AllowInvalidCerts) == "true" || strings.ToLower(s.AllowInvalidCerts) == "yes" {
+		s.AllowInvalidCerts = "y"
 	} else {
-		m.AllowInvalidCerts = "n"
+		s.AllowInvalidCerts = "n"
 	}
 
 	// Default progressive versioning (versions have to be successive to notify)
-	if m.ProgressiveVersioning == "" {
-		m.ProgressiveVersioning = defaults.Monitor.ProgressiveVersioning
-	} else if strings.ToLower(m.ProgressiveVersioning) == "false" || strings.ToLower(m.ProgressiveVersioning) == "no" {
-		m.ProgressiveVersioning = "n"
+	if s.ProgressiveVersioning == "" {
+		s.ProgressiveVersioning = defaults.Service.ProgressiveVersioning
+	} else if strings.ToLower(s.ProgressiveVersioning) == "false" || strings.ToLower(s.ProgressiveVersioning) == "no" {
+		s.ProgressiveVersioning = "n"
 	} else {
-		m.ProgressiveVersioning = "y"
+		s.ProgressiveVersioning = "y"
 	}
 
 	// Default ID if undefined/blank.
-	if m.ID == "" {
-		// Set m.ID to github "owner/repo".
-		if m.Type == "github" {
+	if s.ID == "" {
+		// Set s.ID to github "owner/repo".
+		if s.Type == "github" {
 			// Preserve owner/repo strings.
-			if strings.Count(m.URL, "/") == 1 {
-				m.ID = m.URL
+			if strings.Count(s.URL, "/") == 1 {
+				s.ID = s.URL
 			} else {
 				// Filter "owner/repo" out of "(https://)github.com/owner/repo...".
-				splitURL := strings.Split(m.URL, ".com/")
+				splitURL := strings.Split(s.URL, ".com/")
 				splitURL = strings.SplitN(splitURL[1], "/", 2)
 				owner := splitURL[0]
 				repo := strings.Split(splitURL[1], "/")[0]
-				m.ID = fmt.Sprintf("%s/%s", owner, repo)
+				s.ID = fmt.Sprintf("%s/%s", owner, repo)
 			}
-			// Set m.ID to website (e.g. https://test.com/releases = test)
-		} else if m.Type == "url" {
+			// Set s.ID to website (e.g. https://test.com/releases = test)
+		} else if s.Type == "url" {
 			// Filter owner/repo out if we're using a github URL rather than the API (type=github)
-			if strings.Contains(m.URL, "github.com/") {
-				splitURL := strings.Split(m.URL, ".com/")
+			if strings.Contains(s.URL, "github.com/") {
+				splitURL := strings.Split(s.URL, ".com/")
 				splitURL = strings.SplitN(splitURL[1], "/", 2)
 				owner := splitURL[0]
 				repo := strings.Split(splitURL[1], "/")[0]
-				m.ID = fmt.Sprintf("%s/%s", owner, repo)
+				s.ID = fmt.Sprintf("%s/%s", owner, repo)
 			} else {
-				m.ID = m.URL
-				// if m.URL starts with http(s)://
-				if strings.Contains(m.ID[:8], "://") {
-					m.ID = strings.Split(m.ID, "://")[1]
+				s.ID = s.URL
+				// if s.URL starts with http(s)://
+				if strings.Contains(s.ID[:8], "://") {
+					s.ID = strings.Split(s.ID, "://")[1]
 				}
-				m.ID = strings.Split(m.ID, "/")[0]
-				m.ID = strings.Split(m.ID, ".")[0]
+				s.ID = strings.Split(s.ID, "/")[0]
+				s.ID = strings.Split(s.ID, ".")[0]
 			}
 		}
 	}
 
 	// Default Interval.
-	if m.Interval == 0 {
-		m.Interval = defaults.Monitor.Interval
+	if s.Interval == 0 {
+		s.Interval = defaults.Service.Interval
 	}
 
 	// Default Type.
-	if m.Type == "" {
-		if strings.Count(m.URL, "/") == 1 {
-			m.Type = "github"
+	if s.Type == "" {
+		if strings.Count(s.URL, "/") == 1 {
+			s.Type = "github"
 		} else {
-			m.Type = "URL"
+			s.Type = "URL"
 		}
 	}
 
 	// GitHub - Convert to API URL.
-	if m.Type == "github" {
+	if s.Type == "github" {
 		// If it's "owner/repo" rather than a full path.
-		if strings.Count(m.URL, "/") == 1 {
-			m.URL = fmt.Sprintf("https://api.github.com/repos/%s/releases/latest", m.URL)
+		if strings.Count(s.URL, "/") == 1 {
+			s.URL = fmt.Sprintf("https://api.github.com/repos/%s/releases/latest", s.URL)
 
 			// Convert "https://github.com/owner/repo" to API path.
 			// Don't modify URLs that already point to the API.
-		} else if !strings.Contains(m.URL, "api.github") {
-			m.URL = strings.Split(m.URL, "github.")[1]
+		} else if !strings.Contains(s.URL, "api.github") {
+			s.URL = strings.Split(s.URL, "github.")[1]
 			// split "com/owner/repo" on "/" and keep two substrings, "com" and "owner/repo"
-			m.URL = strings.SplitN(m.URL, "/", 2)[1]
-			m.URL = fmt.Sprintf("https://api.github.com/repos/%s/releases/latest", m.URL)
+			s.URL = strings.SplitN(s.URL, "/", 2)[1]
+			s.URL = fmt.Sprintf("https://api.github.com/repos/%s/releases/latest", s.URL)
 		}
 	}
 
-	m.URLCommands.setDefaults(defaults)
+	s.URLCommands.setDefaults(defaults)
 }
 
-// setDefaults sets the defaults for undefined Monitor values using defaults.
+// setDefaults sets the defaults for undefined Service values using defaults.
 func (c *URLCommandSlice) setDefaults(defaults Defaults) {
 	for index := range *c {
 		(*c)[index].setDefaults(defaults)
@@ -239,7 +239,7 @@ func (c *URLCommandSlice) setDefaults(defaults Defaults) {
 func (c *URLCommand) setDefaults(defaults Defaults) {
 	// Default IgnoreMiss.
 	if c.IgnoreMiss == "" {
-		c.IgnoreMiss = defaults.Monitor.IgnoreMiss
+		c.IgnoreMiss = defaults.Service.IgnoreMiss
 	} else if strings.ToLower(c.IgnoreMiss) == "true" || strings.ToLower(c.IgnoreMiss) == "yes" {
 		c.IgnoreMiss = "y"
 	} else {
@@ -247,9 +247,9 @@ func (c *URLCommand) setDefaults(defaults Defaults) {
 	}
 }
 
-// setVersion sets Monitor.Version to v.
-func (m *Monitor) setVersion(v string) {
-	m.status.version = v
+// setVersion sets Service.Version to v.
+func (s *Service) setVersion(v string) {
+	s.status.version = v
 }
 
 // regexCheckContent returns whether there is a regex match of re on text.
@@ -278,24 +278,27 @@ func getAtIndex(str string, index int) string {
 	return str[index : index+1]
 }
 
-// query queries the Monitor source, updating Monitor.Version
+// query queries the Service source, updating Service.Version
 // and returning true if it has changed (is a new release),
 // otherwise returns false.
-func (m *Monitor) query(i int) bool {
+//
+// index = index of this Service in the parent Monitor
+// monitorID = ID of the parent Monitor
+func (s *Service) query(index int, monitorID string) bool {
 	customTransport := &http.Transport{}
 	// HTTPS insecure skip verify.
-	if m.AllowInvalidCerts == "y" {
+	if s.AllowInvalidCerts == "y" {
 		customTransport = http.DefaultTransport.(*http.Transport).Clone()
 		customTransport.TLSClientConfig = &tls.Config{InsecureSkipVerify: true}
 	}
-	req, err := http.NewRequest(http.MethodGet, m.URL, nil)
+	req, err := http.NewRequest(http.MethodGet, s.URL, nil)
 	if err != nil {
-		log.Printf("ERROR: %s, %s", m.ID, err)
+		log.Printf("ERROR: %s, %s", s.ID, err)
 		return false
 	}
 
-	if m.AccessToken != "" {
-		req.Header.Set("Authorization", fmt.Sprintf("token %s", m.AccessToken))
+	if s.AccessToken != "" {
+		req.Header.Set("Authorization", fmt.Sprintf("token %s", s.AccessToken))
 	}
 
 	client := &http.Client{Transport: customTransport}
@@ -304,40 +307,40 @@ func (m *Monitor) query(i int) bool {
 	if err != nil {
 		// Don't crash on invalid certs.
 		if strings.Contains(err.Error(), "x509") {
-			log.Printf("WARNING: x509 for %s (Cert invalid)", m.ID)
+			log.Printf("WARNING: x509 for %s (%s) (Cert invalid)", s.ID, monitorID)
 			return false
 		}
-		log.Printf("ERROR: %s, %s", m.ID, err)
+		log.Printf("ERROR: %s (%s), %s", s.ID, monitorID, err)
 		return false
 	}
 
 	// Read the response body.
 	rawBody, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
-		log.Printf("ERROR: %s, %s", m.ID, err)
+		log.Printf("ERROR: %s (%s), %s", s.ID, monitorID, err)
 		return false
 	}
 	// Convert the body to string.
 	body := string(rawBody)
 	version := body
 
-	// GitHub monitor.
-	if m.Type == "github" {
+	// GitHub service.
+	if s.Type == "github" {
 		// Check for rate limit.
 		if len(body) < 500 {
 			if strings.Contains(body, "rate limit") {
-				log.Printf("WARNING: Rate limit reached on %s", m.ID)
+				log.Printf("WARNING: Rate limit reached on %s (%s)", s.ID, monitorID)
 				return false
 			}
 		}
 		version = strings.Split(body, `"tag_name"`)[1]
 		version = strings.Split(version, ",")[0]
 		version = strings.Split(version, `"`)[1]
-		// Raw URL Monitor.
+		// Raw URL Service.
 	}
 
 	// Iterate through the commands to filter out the version.
-	for _, command := range m.URLCommands {
+	for _, command := range s.URLCommands {
 		versionBak := version
 		if *debug {
 			log.Printf("DEBUG: Looking through %s", version)
@@ -347,9 +350,9 @@ func (m *Monitor) query(i int) bool {
 			versions := strings.Split(version, command.Text)
 
 			if len(versions) == 1 {
-				if getAtIndex(m.status.monitorMisses, 0) == "0" {
-					log.Printf("WARNING: %s, %s didn't find any '%s' to split on", m.ID, command.Type, command.Text)
-					m.status.monitorMisses = replaceAtIndex(m.status.monitorMisses, '1', 0)
+				if getAtIndex(s.status.serviceMisses, 0) == "0" {
+					log.Printf("WARNING: %s (%s), %s didn't find any '%s' to split on", s.ID, monitorID, command.Type, command.Text)
+					s.status.serviceMisses = replaceAtIndex(s.status.serviceMisses, '1', 0)
 				}
 				// Stop if miss.
 				if command.IgnoreMiss == "n" {
@@ -367,9 +370,9 @@ func (m *Monitor) query(i int) bool {
 			}
 
 			if (len(versions) - index) < 1 {
-				if getAtIndex(m.status.monitorMisses, 1) == "0" {
-					log.Printf("WARNING: %s, %s (%s) returned %d elements but the index wants element number %d", m.ID, command.Type, command.Text, len(versions), (index + 1))
-					m.status.monitorMisses = replaceAtIndex(m.status.monitorMisses, '1', 1)
+				if getAtIndex(s.status.serviceMisses, 1) == "0" {
+					log.Printf("WARNING: %s (%s), %s (%s) returned %d elements but the index wants element number %d", s.ID, monitorID, command.Type, command.Text, len(versions), (index + 1))
+					s.status.serviceMisses = replaceAtIndex(s.status.serviceMisses, '1', 1)
 				}
 				// Stop if miss.
 				if command.IgnoreMiss == "n" {
@@ -391,15 +394,15 @@ func (m *Monitor) query(i int) bool {
 				versions = re.FindAllString(version, -1)
 			} else if command.Type == "regex_submatch" {
 				if command.Index < 0 {
-					log.Printf("WARNING: %s, %s (%s) shouldn't use negative indices as the array is always made up from the first match.", m.ID, command.Type, command.Regex)
+					log.Printf("WARNING: %s (%s), %s (%s) shouldn't use negative indices as the array is always made up from the first match.", s.ID, monitorID, command.Type, command.Regex)
 				}
 				versions = re.FindStringSubmatch(version)
 			}
 
 			if len(versions) == 0 {
-				if getAtIndex(m.status.monitorMisses, 2) == "0" {
-					log.Printf("WARNING: %s, %s (%s) didn't return any matches", m.ID, command.Type, command.Regex)
-					m.status.monitorMisses = replaceAtIndex(m.status.monitorMisses, '1', 2)
+				if getAtIndex(s.status.serviceMisses, 2) == "0" {
+					log.Printf("WARNING: %s (%s), %s (%s) didn't return any matches", s.ID, monitorID, command.Type, command.Regex)
+					s.status.serviceMisses = replaceAtIndex(s.status.serviceMisses, '1', 2)
 				}
 				// Stop if miss.
 				if command.IgnoreMiss == "n" {
@@ -417,9 +420,9 @@ func (m *Monitor) query(i int) bool {
 			}
 
 			if (len(versions) - index) < 1 {
-				if getAtIndex(m.status.monitorMisses, 3) == "0" {
-					log.Printf("WARNING: %s, %s (%s) returned %d elements but the index wants element number %d", m.ID, command.Type, command.Regex, len(versions), (index + 1))
-					m.status.monitorMisses = replaceAtIndex(m.status.monitorMisses, '1', 3)
+				if getAtIndex(s.status.serviceMisses, 3) == "0" {
+					log.Printf("WARNING: %s (%s), %s (%s) returned %d elements but the index wants element number %d", s.ID, monitorID, command.Type, command.Regex, len(versions), (index + 1))
+					s.status.serviceMisses = replaceAtIndex(s.status.serviceMisses, '1', 3)
 				}
 				// Stop if miss.
 				if command.IgnoreMiss == "n" {
@@ -432,27 +435,27 @@ func (m *Monitor) query(i int) bool {
 
 			version = versions[index]
 		default:
-			log.Printf("ERROR: %s, %s is an unknown type for url_commands", m.ID, command.Type)
+			log.Printf("ERROR: %s (%s), %s is an unknown type for url_commands", s.ID, monitorID, command.Type)
 			continue
 		}
 		if *debug {
-			log.Printf("DEBUG: Resolved to %s", version)
+			log.Printf("DEBUG: %s (%s), Resolved to %s", s.ID, monitorID, version)
 		}
 	}
 
 	// If this version is different (new).
-	if version != m.status.version {
+	if version != s.status.version {
 		// Check for a progressive change in version.
-		if m.ProgressiveVersioning == "y" && m.status.version != "" {
+		if s.ProgressiveVersioning == "y" && s.status.version != "" {
 			failedSemanticVersioning := false
-			oldVersion, err := semver.NewVersion(m.status.version)
+			oldVersion, err := semver.NewVersion(s.status.version)
 			if err != nil {
-				log.Printf("ERROR: %s, failed converting '%s' to a semantic version", m.ID, m.status.version)
+				log.Printf("ERROR: %s (%s), failed converting '%s' to a semantic version", s.ID, monitorID, s.status.version)
 				failedSemanticVersioning = true
 			}
 			newVersion, err := semver.NewVersion(version)
 			if err != nil {
-				log.Printf("ERROR: %s, failed converting '%s' to a semantic version", m.ID, version)
+				log.Printf("ERROR: %s (%s), failed converting '%s' to a semantic version", s.ID, monitorID, version)
 				failedSemanticVersioning = true
 			}
 
@@ -466,51 +469,51 @@ func (m *Monitor) query(i int) bool {
 		}
 
 		// Check for a regex match in the body if one is desired.
-		if m.RegexContent != "" {
-			regexMatch := regexCheckContent(m.RegexContent, body, version)
+		if s.RegexContent != "" {
+			regexMatch := regexCheckContent(s.RegexContent, body, version)
 			if !regexMatch {
-				m.status.regexMissesContent++
-				if *verbose && m.status.regexMissesContent == 1 {
-					log.Printf("VERBOSE: %s, Regex not matched on content for version %s", m.ID, version)
+				s.status.regexMissesContent++
+				if *verbose && s.status.regexMissesContent == 1 {
+					log.Printf("VERBOSE: %s (%s), Regex not matched on content for version %s", s.ID, monitorID, version)
 				}
 				return false
 			}
 		}
 		// Check that the version grabbed satisfies the specified regex (if there is any).
-		if m.RegexVersion != "" {
-			regexMatch := regexCheck(m.RegexVersion, version)
+		if s.RegexVersion != "" {
+			regexMatch := regexCheck(s.RegexVersion, version)
 			if !regexMatch {
-				m.status.regexMissesVersion++
-				if *verbose && m.status.regexMissesVersion == 1 {
-					log.Printf("VERBOSE: %s, Regex not matched on version %s", m.ID, version)
+				s.status.regexMissesVersion++
+				if *verbose && s.status.regexMissesVersion == 1 {
+					log.Printf("VERBOSE: %s (%s), Regex not matched on version %s", s.ID, monitorID, version)
 				}
 				return false
 			}
 		}
 
 		// Found new version, so reset regex misses.
-		m.status.regexMissesContent = 0
-		m.status.regexMissesVersion = 0
+		s.status.regexMissesContent = 0
+		s.status.regexMissesVersion = 0
 
 		// First version found.
-		if m.status.version == "" {
-			if m.ProgressiveVersioning == "y" {
+		if s.status.version == "" {
+			if s.ProgressiveVersioning == "y" {
 				_, err := semver.NewVersion(version)
 				if err != nil {
-					log.Printf("ERROR: %s[%d], failed converting '%s' to a semantic version. If all versions are in this style, consider adding url_commands to get the version into the style of '1.2.3a' (https://semver.org/), or disabling progressive versioning (globally with defaults.monitor.progressive_versioning or just for this service with the progressive_versioning var)", m.ID, i, version)
+					log.Printf("ERROR: %s (%s), failed converting '%s' to a semantic version. If all versions are in this style, consider adding url_commands to get the version into the style of '1.2.3a' (https://semver.org/), or disabling progressive versioning (globally with defaults.service.progressive_versioning or just for this service with the progressive_versioning var)", s.ID, monitorID, version)
 					return false
 				}
 			}
 
-			m.setVersion(version)
-			log.Printf("INFO: %s, Starting Release - %s", m.ID, version)
+			s.setVersion(version)
+			log.Printf("INFO: %s (%s), Starting Release - %s", s.ID, monitorID, version)
 			// Don't notify on first version.
 			return false
 		}
 
 		// New version found.
-		m.setVersion(version)
-		log.Printf("INFO: %s, New Release - %s", m.ID, version)
+		s.setVersion(version)
+		log.Printf("INFO: %s (%s), New Release - %s", s.ID, monitorID, version)
 		return true
 	}
 
