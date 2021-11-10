@@ -39,7 +39,7 @@ func TestSetDefaults(t *testing.T) {
 	var (
 		config     Config
 		configFile string = "config.yml.test"
-		wantString string = ""
+		wantString string
 	)
 	config.getConf(configFile)
 	wantString = "false"
