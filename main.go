@@ -12,7 +12,6 @@ import (
 	"log"
 	"os"
 	"strings"
-	"time"
 
 	"gopkg.in/yaml.v3"
 )
@@ -29,41 +28,14 @@ type Config struct {
 
 // Defaults is the global default for vars.
 type Defaults struct {
-	Service ServiceDefaults `yaml:"service"`
-	Slack   SlackDefaults   `yaml:"slack"`
-	WebHook WebHookDefaults `yaml:"webhook"`
-}
-
-// ServiceDefaults are the defaults for Service.
-type ServiceDefaults struct {
-	AccessToken           string `yaml:"access_token"`           // GitHub access token.
-	AllowInvalidCerts     string `yaml:"allow_invalid"`          // Disallows invalid HTTPS certificates.
-	ProgressiveVersioning string `yaml:"progressive_versioning"` // Version has to be greater than the previous to trigger Slack(s)/WebHook(s)
-	Interval              int    `yaml:"interval"`               // Interval (in seconds) between each version check.
-	IgnoreMiss            string `yaml:"ignore_misses"`          // Ignore URLCommands that fail (e.g. split on text that doesn't exist)
-}
-
-// SlackDefaults are the defaults for Slack.
-type SlackDefaults struct {
-	IconEmoji string        `yaml:"icon_emoji"` // Icon emoji to use for the Slack message.
-	IconURL   string        `yaml:"icon_url"`   // Icon URL to use for the Slack message.
-	Username  string        `yaml:"username"`   // Username to send the Slack message as.
-	Message   string        `yaml:"message"`    // Slack message to send.
-	Delay     time.Duration `yaml:"delay"`      // The delay before sending the Slack message.
-	MaxTries  int           `yaml:"maxtries"`   // Number of times to attempt sending the Slack message until a 200 is received.
-}
-
-// WebHookDefaults are the defaults for webhook.
-type WebHookDefaults struct {
-	DesiredStatusCode int           `yaml:"desired_status_code"` // Re-send each WebHook until we get this status code. (0 = accept all 2** codes).
-	Delay             time.Duration `yaml:"delay"`               // The delay before sending the WebHook.
-	MaxTries          int           `yaml:"maxtries"`            // Number of times to attempt sending the WebHook if the desired status code is not received.
-	SilentFails       string        `yaml:"silent_fails"`        // Whether to notify if a WebHook fails MaxTries times.
+	Service Service `yaml:"service"`
+	Slack   Slack   `yaml:"slack"`
+	WebHook WebHook `yaml:"webhook"`
 }
 
 // setDefaults will set the defaults for each undefined var.
 func (d *Defaults) setDefaults() {
-	// ServiceDefaults defaults.
+	// Service defaults.
 	if strings.ToLower(d.Service.AllowInvalidCerts) == "true" || strings.ToLower(d.Service.AllowInvalidCerts) == "yes" {
 		d.Service.AllowInvalidCerts = "y"
 	} else {
@@ -83,12 +55,9 @@ func (d *Defaults) setDefaults() {
 		d.Service.IgnoreMiss = "n"
 	}
 
-	// SlackDefaults defaults.
-	if d.Slack.Message == "" {
-		d.Slack.Message = "<${service_url}|${service_id}> - ${version} released"
-	}
-	if d.Slack.Username == "" {
-		d.Slack.Username = "Release Notifier"
+	// Slack defaults.
+	if d.Slack.Delay == "" {
+		d.Slack.Delay = "0s"
 	}
 	if d.Slack.IconEmoji == "" && d.Slack.IconURL == "" {
 		d.Slack.IconEmoji = ":github:"
@@ -96,8 +65,17 @@ func (d *Defaults) setDefaults() {
 	if d.Slack.MaxTries == 0 {
 		d.Slack.MaxTries = 3
 	}
+	if d.Slack.Message == "" {
+		d.Slack.Message = "<${service_url}|${service_id}> - ${version} released"
+	}
+	if d.Slack.Username == "" {
+		d.Slack.Username = "Release Notifier"
+	}
 
-	// WebHookDefaults defaults.
+	// WebHook defaults.
+	if d.WebHook.Delay == "" {
+		d.WebHook.Delay = "0s"
+	}
 	if d.WebHook.DesiredStatusCode == 0 {
 		d.WebHook.DesiredStatusCode = 0
 	}

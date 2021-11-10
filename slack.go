@@ -25,7 +25,7 @@ type Slack struct {
 	Username  string `yaml:"username"`   // "Release Notifier"
 	Message   string `yaml:"message"`    // "${service} - ${version} released"
 	Delay     string `yaml:"delay"`      // The delay before sending the Slack message.
-	MaxTries  int    `yaml:"maxtries"`   // Number of times to attempt sending the Slack message if a 200 is not received.
+	MaxTries  uint   `yaml:"maxtries"`   // Number of times to attempt sending the Slack message if a 200 is not received.
 }
 
 // UnmarshalYAML allows handling of a dict as well as a list of dicts.
@@ -69,7 +69,7 @@ func (s *Slack) setDefaults(defaults Defaults) {
 		s.IconURL = defaults.Slack.IconURL
 	}
 
-	s.Delay = valueOrDefault(s.Delay, defaults.Slack.Delay.String())
+	s.Delay = valueOrDefault(s.Delay, defaults.Slack.Delay)
 
 	if s.MaxTries == 0 {
 		s.MaxTries = defaults.Slack.MaxTries

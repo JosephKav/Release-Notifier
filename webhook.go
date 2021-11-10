@@ -29,7 +29,7 @@ type WebHook struct {
 	Secret            string `yaml:"secret"`              // "SECRET"
 	DesiredStatusCode int    `yaml:"desired_status_code"` // e.g. 202
 	Delay             string `yaml:"delay"`               // The delay before sending the WebHook.
-	MaxTries          int    `yaml:"maxtries"`            // Number of times to attempt sending the WebHook if the desired status code is not received.
+	MaxTries          uint   `yaml:"maxtries"`            // Number of times to attempt sending the WebHook if the desired status code is not received.
 	SilentFails       string `yaml:"silent_fails"`        // Whether to notify if this WebHook fails MaxTries times.
 }
 
@@ -70,7 +70,7 @@ func (w *WebHook) setDefaults(defaults Defaults) {
 	}
 
 	if w.Delay == "" {
-		w.Delay = defaults.WebHook.Delay.String()
+		w.Delay = valueOrDefault(w.Delay, defaults.WebHook.Delay)
 	}
 
 	if w.MaxTries == 0 {

@@ -29,9 +29,10 @@ type Service struct {
 	ProgressiveVersioning string          `yaml:"progressive_versioning"` // default - true  = Version has to be greater than the previous to trigger Slack(s)/WebHook(s).
 	AllowInvalidCerts     string          `yaml:"allow_invalid"`          // default - false = Disallows invalid HTTPS certificates.
 	AccessToken           string          `yaml:"access_token"`           // GitHub access token to use.
-	Interval              int             `yaml:"interval"`               // 600 = Sleep 600 seconds between queries.
+	Interval              uint            `yaml:"interval"`               // 600 = Sleep 600 seconds between queries.
 	SkipSlack             bool            `yaml:"skip_slack"`             // default - false = Don't skip Slack messages for new releases.
 	SkipWebHook           bool            `yaml:"skip_webhook"`           // default - false = Don't skip WebHooks for new releases.
+	IgnoreMiss            string          `yaml:"ignore_misses"`          // Ignore URLCommands that fail (e.g. split on text that doesn't exist)
 	Slack                 Slack           `yaml:"slack"`                  // Override Slack message vars.
 	status                status          ``                              // Track the Status of this source (version and regex misses).
 }
@@ -117,8 +118,8 @@ func (s *Service) checkValues(serviceID string, index int) {
 // status is the current state of the Service element (version and regex misses).
 type status struct {
 	version            string // Latest version found from query().
-	regexMissesContent int    // Counter for the number of regex misses on URL content.
-	regexMissesVersion int    // Counter for the number of regex misses on version.
+	regexMissesContent uint   // Counter for the number of regex misses on URL content.
+	regexMissesVersion uint   // Counter for the number of regex misses on version.
 	serviceMisses      string // "1000" 1 = miss, 0 = no miss for split etc.
 }
 
@@ -225,21 +226,29 @@ func (s *Service) setDefaults(defaults Defaults) {
 		}
 	}
 
-	s.URLCommands.setDefaults(defaults)
+	if s.IgnoreMiss == "" {
+		s.IgnoreMiss = defaults.Service.IgnoreMiss
+	} else if strings.ToLower(s.IgnoreMiss) == "true" || strings.ToLower(s.IgnoreMiss) == "yes" {
+		s.IgnoreMiss = "y"
+	} else {
+		s.IgnoreMiss = "n"
+	}
+
+	s.URLCommands.setDefaults(defaults, s)
 }
 
 // setDefaults sets the defaults for undefined Service values using defaults.
-func (c *URLCommandSlice) setDefaults(defaults Defaults) {
+func (c *URLCommandSlice) setDefaults(defaults Defaults, service *Service) {
 	for index := range *c {
-		(*c)[index].setDefaults(defaults)
+		(*c)[index].setDefaults(defaults, service)
 	}
 }
 
 // setDefaults sets the defaults for each undefined var using defaults.
-func (c *URLCommand) setDefaults(defaults Defaults) {
+func (c *URLCommand) setDefaults(defaults Defaults, service *Service) {
 	// Default IgnoreMiss.
 	if c.IgnoreMiss == "" {
-		c.IgnoreMiss = defaults.Service.IgnoreMiss
+		c.IgnoreMiss = service.IgnoreMiss
 	} else if strings.ToLower(c.IgnoreMiss) == "true" || strings.ToLower(c.IgnoreMiss) == "yes" {
 		c.IgnoreMiss = "y"
 	} else {
