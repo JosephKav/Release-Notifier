@@ -1,0 +1,78 @@
+defaults:
+  service:
+    interval: 123
+    access_token: ghp_AAAA
+  slack:
+    message: '<${service_url}|${service_id}> - ${version} released'
+    username: 'Release Notifier'
+    icon_emoji: ':github_background:'
+    maxtries: 3
+    delay: 1s
+  webhook:
+    desired_status_code: 0
+    maxtries: 3
+    delay: 2s
+    silent_fails: false
+monitor:
+  - id: NoDefaults
+    service:
+      type: github
+      url: JosephKav/Release-Notifier
+      url_commands: # Remove the v for progressive versioning
+        - type:  regex_submatch
+          regex: 'v(.*)'
+          index: 1
+      interval: 600
+      regex_version: '^[0-9.]+[0-9]$'
+      regex_content: Release-Notifier-${version_no_v}-linux-amd64
+    webhook:
+      type: github
+      url: https://awx.example.com/api/v2/job_templates/XX/github/
+      secret: YYYY
+      desired_status_code: 202
+      maxtries: 1
+      delay: 3s
+      silent_fails: false
+    slack:
+      url: https://mattermost.example.com/hooks/ZZZZ
+      message: overriddenMessage
+      username: overriddenUsername
+      icon_emoji: overriddenIconEmoji
+      maxtries: 10
+      delay: 4s
+  - id: WantDefaults
+    service:
+      type: github
+      url: JosephKav/Release-Notifier
+      url_commands: # Remove the v for progressive versioning
+        - type:  regex_submatch
+          regex: 'v(.*)'
+          index: 1
+      regex_version: '^[0-9.]+[0-9]$'
+      regex_content: Release-Notifier-${version_no_v}-linux-amd64
+    webhook:
+      type: github
+      url: https://awx.example.com/api/v2/job_templates/XX/github/
+      secret: YYYY
+    slack:
+      url: https://mattermost.example.com/hooks/ZZZZ
+      icon_url: https://raw.githubusercontent.com/go-gitea/gitea/main/public/img/logo.png
+  - id: Gitea
+    service:
+      type: github
+      url: go-gitea/gitea
+      url_commands: # Remove the v for progressive versioning
+        - type:  regex_submatch
+          regex: 'v(.*)'
+          index: 1
+      regex_version: '^[0-9.]+[0-9]$'
+      regex_content: gitea-${version_no_v}-linux-amd64
+    webhook:
+      type: github
+      url: https://awx.example.com/api/v2/job_templates/XX/github/
+      secret: YYYY
+      delay: 0s
+    slack:
+      url: https://mattermost.example.com/hooks/ZZZZ
+      icon_url: https://raw.githubusercontent.com/go-gitea/gitea/main/public/img/logo.png
+      delay: 0s

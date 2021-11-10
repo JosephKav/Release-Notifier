@@ -126,6 +126,16 @@ func valueOrDefault(value string, dflt string) string {
 	return value
 }
 
+// SetLogLevel will set logLevel to value if that's in the acceptable range, 2 otherwise
+func SetLogLevel(value int) {
+	if value > 4 || value < 0 {
+		log.Println("ERROR: loglevel should be between 0 and 4 (inclusive), setting yours to 2 (info)")
+		*logLevel = 2
+	} else {
+		*logLevel = value
+	}
+}
+
 // main loads the config and then calls Monitor.Track to monitor
 // each Service of the monitor targets for version changes and act
 // on them as defined.
