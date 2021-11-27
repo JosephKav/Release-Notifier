@@ -29,15 +29,12 @@ For example, you could set it to monitor the Gitea repo ([go-gitea/gitea](https:
 $ release_notifier -config myConfig.yml -loglevel 3
 2021/11/08 02:18:24 VERBOSE: Loading config from 'config.yml'
 2021/11/08 02:18:24 INFO: 4 targets with 5 services to monitor:
-2021/11/08 02:18:24   - Authentik:
-2021/11/08 02:18:24       - goauthentik/authentik
-2021/11/08 02:18:24   - AWX:
-2021/11/08 02:18:24       - ansible/awx-operator
+2021/11/08 02:18:24   - goauthentik/authentik
+2021/11/08 02:18:24   - ansible/awx-operator
 2021/11/08 02:18:24   - CV-Site:
 2021/11/08 02:18:24       - gohugoio/hugo
 2021/11/08 02:18:24       - adnanh/webhook
-2021/11/08 02:18:24   - louislam/uptime-kuma:
-2021/11/08 02:18:24       - louislam/uptime-kuma
+2021/11/08 02:18:24   - louislam/uptime-kuma
 2021/11/08 02:18:24 VERBOSE: Tracking goauthentik/authentik at https://api.github.com/repos/goauthentik/authentik/releases/latest every 600 seconds
 2021/11/08 02:18:24 INFO: goauthentik/authentik (Authentik), Starting Release - 2021.10.2
 2021/11/08 02:18:35 VERBOSE: Tracking ansible/awx-operator at https://api.github.com/repos/ansible/awx-operator/releases/latest every 600 seconds
@@ -47,10 +44,10 @@ $ release_notifier -config myConfig.yml -loglevel 3
 2021/11/08 02:19:09 VERBOSE: Tracking adnanh/webhook at https://api.github.com/repos/adnanh/webhook/releases/latest every 600 seconds
 2021/11/08 02:19:09 INFO: adnanh/webhook (CV-Site), Starting Release - 2.8.0
 2021/11/08 02:19:28 VERBOSE: Tracking louislam/uptime-kuma at https://api.github.com/repos/louislam/uptime-kuma/releases/latest every 600 seconds
-2021/11/08 02:19:28 INFO: louislam/uptime-kuma (louislam/uptime-kuma), Starting Release - 1.10.0
-2021/11/08 10:11:58 INFO: louislam/uptime-kuma (louislam/uptime-kuma), New Release - 1.10.1
-2021/11/08 10:11:58 INFO: louislam/uptime-kuma (louislam/uptime-kuma), Slack message sent
-2021/11/08 10:11:59 INFO: louislam/uptime-kuma (louislam/uptime-kuma), (202) WebHook received
+2021/11/08 02:19:28 INFO: louislam/uptime-kuma (Uptime-Kuma), Starting Release - 1.10.0
+2021/11/08 10:11:58 INFO: louislam/uptime-kuma (Uptime-Kuma), New Release - 1.10.1
+2021/11/08 10:11:58 INFO: louislam/uptime-kuma (Uptime-Kuma), Slack message sent
+2021/11/08 10:11:59 INFO: louislam/uptime-kuma (Uptime-Kuma), (202) WebHook received
 2021/11/08 16:09:35 INFO: gohugoio/hugo (CV-Site), New Release - 0.89.2
 2021/11/08 16:09:35 INFO: gohugoio/hugo (CV-Site), Slack message sent
 2021/11/08 16:09:40 ERROR: gohugoio/hugo (CV-Site), WebHook
@@ -62,9 +59,9 @@ Post "https://awx.example.io/api/v2/job_templates/30/github/": context deadline 
 2021/11/08 22:08:57 ERROR: goauthentik/authentik (Authentik), WebHook
 Post "https://awx.example.io/api/v2/job_templates/40/github/": context deadline exceeded
 2021/11/08 22:09:07 INFO: goauthentik/authentik (Authentik), (202) WebHook received
-2021/11/09 14:52:40 INFO: louislam/uptime-kuma (louislam/uptime-kuma), New Release - 1.10.2
-2021/11/09 14:52:40 INFO: louislam/uptime-kuma (louislam/uptime-kuma), Slack message sent
-2021/11/09 14:52:41 INFO: louislam/uptime-kuma (louislam/uptime-kuma), (202) WebHook received
+2021/11/09 14:52:40 INFO: louislam/uptime-kuma (Uptime-Kuma), New Release - 1.10.2
+2021/11/09 14:52:40 INFO: louislam/uptime-kuma (Uptime-Kuma), Slack message sent
+2021/11/09 14:52:41 INFO: louislam/uptime-kuma (Uptime-Kuma), (202) WebHook received
 ```
 
 ## Command-line arguments
