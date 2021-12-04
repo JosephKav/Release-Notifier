@@ -26,7 +26,7 @@ For example, you could set it to monitor the Gitea repo ([go-gitea/gitea](https:
 ## Output
 ![image](https://user-images.githubusercontent.com/4267227/138481247-cbee6073-bf6c-4be2-8b2e-875f3719e738.png)
 ```bash
-$ release_notifier -config myConfig.yml -loglevel 3
+$ release_notifier -config myConfig.yml -loglevel 3 -timestamps
 2021/11/08 02:18:24 VERBOSE: Loading config from 'config.yml'
 2021/11/08 02:18:24 INFO: 4 targets with 5 services to monitor:
 2021/11/08 02:18:24   - goauthentik/authentik
