@@ -2,7 +2,6 @@ package main
 
 import (
 	"fmt"
-	"log"
 	"math/rand"
 	"time"
 )
@@ -38,8 +37,12 @@ func (m *Monitor) print() {
 		fmt.Printf("        url: '%s'\n", service.URL)
 		service.URLCommands.print("        ")
 		fmt.Printf("        interval: %s\n", service.Interval)
-		fmt.Printf("        regex_content: %s\n", service.RegexContent)
-		fmt.Printf("        regex_version: %s\n", service.RegexVersion)
+		if service.RegexContent != "" {
+			fmt.Printf("        regex_content: %s\n", service.RegexContent)
+		}
+		if service.RegexVersion != "" {
+			fmt.Printf("        regex_version: %s\n", service.RegexVersion)
+		}
 		fmt.Printf("        progressive_versioning: %s\n", service.ProgressiveVersioning)
 		fmt.Printf("        skip_slack: %t\n", service.SkipSlack)
 		fmt.Printf("        skip_webhook: %t\n", service.SkipWebHook)
@@ -78,9 +81,8 @@ func (m *MonitorSlice) track() {
 	// Loop through each service.
 	for monitorIndex := range *m {
 		for serviceIndex := range (*m)[monitorIndex].Service {
-			if *logLevel > 2 {
-				log.Printf("VERBOSE: Tracking %s at %s every %s", (*m)[monitorIndex].Service[serviceIndex].ID, (*m)[monitorIndex].Service[serviceIndex].URL, (*m)[monitorIndex].Service[serviceIndex].Interval)
-			}
+			msg := fmt.Sprintf("Tracking %s at %s every %s", (*m)[monitorIndex].Service[serviceIndex].ID, (*m)[monitorIndex].Service[serviceIndex].URL, (*m)[monitorIndex].Service[serviceIndex].Interval)
+			logVerbose(*logLevel, msg, true)
 
 			// Track this Service in a infinite loop goroutine.
 			go (*m)[monitorIndex].track(serviceIndex)

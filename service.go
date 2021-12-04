@@ -2,6 +2,7 @@ package main
 
 import (
 	"crypto/tls"
+	"errors"
 	"fmt"
 	"io/ioutil"
 	"log"
@@ -131,11 +132,158 @@ func (c *URLCommand) print(prefix string) {
 	}
 }
 
+// setDefaults sets undefined variables to their default.
+func (c *URLCommandSlice) run(monitorID string, service *Service, text string) (string, error) {
+	var err error
+	for commandIndex := range *c {
+		text, err = (*c)[commandIndex].run(monitorID, service, text)
+		if err != nil {
+			return text, err
+		}
+	}
+	return text, nil
+}
+
+func (c *URLCommand) run(monitorID string, service *Service, text string) (string, error) {
+	// Iterate through the commands to filter the text.
+	textBak := text
+	msg := fmt.Sprintf("Looking through %s", text)
+	logDebug(*logLevel, msg, true)
+
+	var err error = nil
+
+	switch c.Type {
+	case "split":
+		text, err = c.split(monitorID, *service, text)
+	case "replace":
+		text = strings.ReplaceAll(text, c.Old, c.New)
+	case "regex", "regex_submatch":
+		text, err = c.regex(monitorID, *service, text)
+	}
+	if err != nil {
+		return textBak, nil
+	}
+
+	msg = fmt.Sprintf("%s (%s), Resolved to %s", service.ID, monitorID, text)
+	logDebug(*logLevel, msg, true)
+	return text, nil
+}
+
+func (c *URLCommand) regex(monitorID string, service Service, text string) (string, error) {
+	re := regexp.MustCompile(c.Regex)
+
+	var texts []string
+	switch c.Type {
+	case "regex":
+		texts = re.FindAllString(text, -1)
+	case "regex_submatch":
+		if c.Index < 0 {
+			msg := fmt.Sprintf("%s (%s), %s (%s) shouldn't use negative indices as the array is always made up from the first match.", service.ID, monitorID, c.Type, c.Regex)
+			logWarn(*logLevel, msg, true)
+		}
+		texts = re.FindStringSubmatch(text)
+	}
+
+	if len(texts) == 0 {
+		msg := fmt.Sprintf("%s (%s), %s (%s) didn't return any matches", service.ID, monitorID, c.Type, c.Regex)
+		if getAtIndex(service.status.serviceMisses, 2) == "0" {
+			logWarn(*logLevel, msg, true)
+			service.status.serviceMisses = replaceAtIndex(service.status.serviceMisses, '1', 2)
+		}
+		// Stop if miss.
+		if c.IgnoreMiss == "n" {
+			return text, errors.New(msg)
+		}
+		// Ignore Misses.
+		return text, nil
+	}
+
+	index := c.Index
+	// Handle negative indices.
+	if c.Index < 0 {
+		index = len(texts) + c.Index
+	}
+
+	if (len(texts) - index) < 1 {
+		msg := fmt.Sprintf("%s (%s), %s (%s) returned %d elements but the index wants element number %d", service.ID, monitorID, c.Type, c.Regex, len(texts), (index + 1))
+		if getAtIndex(service.status.serviceMisses, 3) == "0" {
+			logWarn(*logLevel, msg, true)
+			service.status.serviceMisses = replaceAtIndex(service.status.serviceMisses, '1', 3)
+		}
+		// Stop if miss.
+		if c.IgnoreMiss == "n" {
+			return text, errors.New(msg)
+		}
+		// Ignore Misses.
+		return text, nil
+	}
+
+	return texts[index], nil
+}
+
+func (c *URLCommand) split(monitorID string, service Service, text string) (string, error) {
+	texts := strings.Split(text, c.Text)
+
+	if len(texts) == 1 {
+		msg := fmt.Sprintf("%s (%s), %s didn't find any '%s' to split on", service.ID, monitorID, c.Type, c.Text)
+		if getAtIndex(service.status.serviceMisses, 0) == "0" {
+			logWarn(*logLevel, msg, true)
+			service.status.serviceMisses = replaceAtIndex(service.status.serviceMisses, '1', 0)
+		}
+		// Stop if miss.
+		if c.IgnoreMiss == "n" {
+			return text, errors.New(msg)
+		}
+		// Ignore Misses.
+		return text, nil
+	}
+
+	index := c.Index
+	// Handle negative indices.
+	if index < 0 {
+		index = len(texts) + index
+	}
+
+	if (len(texts) - index) < 1 {
+		msg := fmt.Sprintf("%s (%s), %s (%s) returned %d elements but the index wants element number %d", service.ID, monitorID, c.Type, c.Text, len(texts), (index + 1))
+		if getAtIndex(service.status.serviceMisses, 1) == "0" {
+			logWarn(*logLevel, msg, true)
+			service.status.serviceMisses = replaceAtIndex(service.status.serviceMisses, '1', 1)
+		}
+		// Stop if miss.
+		if c.IgnoreMiss == "n" {
+			return text, errors.New(msg)
+		}
+		// Ignore Misses.
+		return text, nil
+	}
+
+	return texts[index], nil
+}
+
+// checkValues will check the variables for the URLCommand's in the URLCommandSlice.
+func (c *URLCommandSlice) checkValues(monitorID string, serviceID string) {
+	for index := range *c {
+		(*c)[index].checkValues(monitorID, serviceID)
+	}
+}
+
+// checkValues will check the variables for the URLCommand.
+func (c *URLCommand) checkValues(monitorID string, serviceID string) {
+	switch c.Type {
+	case "split", "replace", "regex", "regex_submatch":
+	default:
+		log.Printf("ERROR: %s (%s), %s is an unknown type for url_commands", serviceID, monitorID, c.Type)
+	}
+}
+
 // checkValues will check the variables for the Service's in the ServiceSlice.
 func (s *ServiceSlice) checkValues(monitorID string) {
 	for index := range *s {
 		(*s)[index].checkValues(monitorID, index, len(*s) == 1)
+		(*s)[index].URLCommands.checkValues(monitorID, (*s)[index].ID)
 	}
+
 }
 
 // checkValues will check the variables for the Service.
@@ -344,12 +492,12 @@ func (s *Service) query(index int, monitorID string) bool {
 	if err != nil {
 		// Don't crash on invalid certs.
 		if strings.Contains(err.Error(), "x509") {
-			if *logLevel > 0 {
-				log.Printf("WARNING: x509 for %s (%s) (Cert invalid)", s.ID, monitorID)
-			}
+			msg := fmt.Sprintf("x509 for %s (%s) (Cert invalid)", s.ID, monitorID)
+			logWarn(*logLevel, msg, true)
 			return false
 		}
-		log.Printf("ERROR: %s (%s), %s", s.ID, monitorID, err)
+		msg := fmt.Sprintf("%s (%s), %s", s.ID, monitorID, err)
+		logError(msg, true)
 		return false
 	}
 
@@ -376,9 +524,8 @@ func (s *Service) query(index int, monitorID string) bool {
 				return false
 			}
 			if strings.Contains(body, "rate limit") {
-				if *logLevel > 0 {
-					log.Printf("WARNING: Rate limit reached on %s (%s)", s.ID, monitorID)
-				}
+				msg := fmt.Sprintf("Rate limit reached on %s (%s)", s.ID, monitorID)
+				logWarn(*logLevel, msg, true)
 				return false
 			}
 		}
@@ -389,117 +536,10 @@ func (s *Service) query(index int, monitorID string) bool {
 	}
 
 	// Iterate through the commands to filter out the version.
-	for _, command := range s.URLCommands {
-		versionBak := version
-		if *logLevel > 3 {
-			log.Printf("DEBUG: Looking through %s", version)
-		}
-		switch command.Type {
-		case "split":
-			versions := strings.Split(version, command.Text)
-
-			if len(versions) == 1 {
-				if getAtIndex(s.status.serviceMisses, 0) == "0" {
-					if *logLevel > 0 {
-						log.Printf("WARNING: %s (%s), %s didn't find any '%s' to split on", s.ID, monitorID, command.Type, command.Text)
-					}
-					s.status.serviceMisses = replaceAtIndex(s.status.serviceMisses, '1', 0)
-				}
-				// Stop if miss.
-				if command.IgnoreMiss == "n" {
-					return false
-				}
-				// Ignore Misses.
-				version = versionBak
-				continue
-			}
-
-			index := command.Index
-			// Handle negative indices.
-			if index < 0 {
-				index = len(versions) + index
-			}
-
-			if (len(versions) - index) < 1 {
-				if getAtIndex(s.status.serviceMisses, 1) == "0" {
-					if *logLevel > 0 {
-						log.Printf("WARNING: %s (%s), %s (%s) returned %d elements but the index wants element number %d", s.ID, monitorID, command.Type, command.Text, len(versions), (index + 1))
-					}
-					s.status.serviceMisses = replaceAtIndex(s.status.serviceMisses, '1', 1)
-				}
-				// Stop if miss.
-				if command.IgnoreMiss == "n" {
-					return false
-				}
-				// Ignore Misses.
-				version = versionBak
-				continue
-			}
-
-			version = versions[index]
-		case "replace":
-			version = strings.ReplaceAll(version, command.Old, command.New)
-		case "regex", "regex_submatch":
-			re := regexp.MustCompile(command.Regex)
-
-			var versions []string
-			if command.Type == "regex" {
-				versions = re.FindAllString(version, -1)
-			} else if command.Type == "regex_submatch" {
-				if command.Index < 0 {
-					if *logLevel > 0 {
-						log.Printf("WARNING: %s (%s), %s (%s) shouldn't use negative indices as the array is always made up from the first match.", s.ID, monitorID, command.Type, command.Regex)
-					}
-				}
-				versions = re.FindStringSubmatch(version)
-			}
-
-			if len(versions) == 0 {
-				if getAtIndex(s.status.serviceMisses, 2) == "0" {
-					if *logLevel > 0 {
-						log.Printf("WARNING: %s (%s), %s (%s) didn't return any matches", s.ID, monitorID, command.Type, command.Regex)
-					}
-					s.status.serviceMisses = replaceAtIndex(s.status.serviceMisses, '1', 2)
-				}
-				// Stop if miss.
-				if command.IgnoreMiss == "n" {
-					return false
-				}
-				// Ignore Misses.
-				version = versionBak
-				continue
-			}
-
-			index := command.Index
-			// Handle negative indices.
-			if command.Index < 0 {
-				index = len(versions) + command.Index
-			}
-
-			if (len(versions) - index) < 1 {
-				if getAtIndex(s.status.serviceMisses, 3) == "0" {
-					if *logLevel > 0 {
-						log.Printf("WARNING: %s (%s), %s (%s) returned %d elements but the index wants element number %d", s.ID, monitorID, command.Type, command.Regex, len(versions), (index + 1))
-					}
-					s.status.serviceMisses = replaceAtIndex(s.status.serviceMisses, '1', 3)
-				}
-				// Stop if miss.
-				if command.IgnoreMiss == "n" {
-					return false
-				}
-				// Ignore Misses.
-				version = versionBak
-				continue
-			}
-
-			version = versions[index]
-		default:
-			log.Printf("ERROR: %s (%s), %s is an unknown type for url_commands", s.ID, monitorID, command.Type)
-			continue
-		}
-		if *logLevel > 3 {
-			log.Printf("DEBUG: %s (%s), Resolved to %s", s.ID, monitorID, version)
-		}
+	version, err = s.URLCommands.run(monitorID, s, version)
+	// If URLCommands failed, return
+	if err != nil {
+		return false
 	}
 
 	// If this version is different (new).
@@ -531,10 +571,9 @@ func (s *Service) query(index int, monitorID string) bool {
 		if s.RegexContent != "" {
 			regexMatch := regexCheckContent(s.RegexContent, body, version)
 			if !regexMatch {
+				msg := fmt.Sprintf("%s (%s), Regex not matched on content for version %s", s.ID, monitorID, version)
 				s.status.regexMissesContent++
-				if *logLevel > 2 && s.status.regexMissesContent == 1 {
-					log.Printf("VERBOSE: %s (%s), Regex not matched on content for version %s", s.ID, monitorID, version)
-				}
+				logVerbose(*logLevel, msg, s.status.regexMissesContent == 1)
 				return false
 			}
 		}
@@ -542,10 +581,9 @@ func (s *Service) query(index int, monitorID string) bool {
 		if s.RegexVersion != "" {
 			regexMatch := regexCheck(s.RegexVersion, version)
 			if !regexMatch {
+				msg := fmt.Sprintf("%s (%s), Regex not matched on version %s", s.ID, monitorID, version)
 				s.status.regexMissesVersion++
-				if *logLevel > 2 && s.status.regexMissesVersion == 1 {
-					log.Printf("VERBOSE: %s (%s), Regex not matched on version %s", s.ID, monitorID, version)
-				}
+				logVerbose(*logLevel, msg, s.status.regexMissesVersion == 1)
 				return false
 			}
 		}
@@ -564,18 +602,16 @@ func (s *Service) query(index int, monitorID string) bool {
 			}
 
 			s.setVersion(version)
-			if *logLevel > 1 {
-				log.Printf("INFO: %s (%s), Starting Release - %s", s.ID, monitorID, version)
-			}
+			msg := fmt.Sprintf("%s (%s), Starting Release - %s", s.ID, monitorID, version)
+			logInfo(*logLevel, msg, true)
 			// Don't notify on first version.
 			return false
 		}
 
 		// New version found.
 		s.setVersion(version)
-		if *logLevel > 1 {
-			log.Printf("INFO: %s (%s), New Release - %s", s.ID, monitorID, version)
-		}
+		msg := fmt.Sprintf("%s (%s), New Release - %s", s.ID, monitorID, version)
+		logInfo(*logLevel, msg, true)
 		return true
 	}
 

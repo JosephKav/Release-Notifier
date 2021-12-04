@@ -53,8 +53,8 @@ func (s *SlackSlice) UnmarshalYAML(unmarshal func(interface{}) error) error {
 
 // setDefaults sets undefined variables to their default.
 func (s *SlackSlice) setDefaults(monitorID string, defaults Defaults) {
-	for SlackIndex := range *s {
-		(*s)[SlackIndex].setDefaults(defaults)
+	for slackIndex := range *s {
+		(*s)[slackIndex].setDefaults(defaults)
 	}
 	(*s).checkValues(monitorID)
 }
@@ -127,9 +127,8 @@ func (s *SlackSlice) send(monitorID string, svc *Service, message string) {
 
 			// Delay sending the Slack message by the defined interval.
 			sleepTime, _ := time.ParseDuration((*s)[index].Delay)
-			if sleepTime != 0 && *logLevel > 1 {
-				log.Printf("INFO: %s, Sleeping for %s before sending the Slack message", monitorID, (*s)[index].Delay)
-			}
+			msg := fmt.Sprintf("%s, Sleeping for %s before sending the Slack message", monitorID, (*s)[index].Delay)
+			logInfo(*logLevel, msg, sleepTime != 0)
 			time.Sleep(sleepTime)
 
 			for {
@@ -147,9 +146,8 @@ func (s *SlackSlice) send(monitorID string, svc *Service, message string) {
 				// Give up after MaxTries.
 				if triesLeft == 0 {
 					// If not verbose or above (above, this would already have been printed).
-					if *logLevel < 3 {
-						log.Printf("ERROR: %s", err)
-					}
+					msg := fmt.Sprintf("%s", err)
+					logError(msg, (*logLevel < 3))
 					log.Printf("ERROR: %s (%s), Failed %d times to send a slack message to %s", svc.ID, monitorID, (*s)[index].MaxTries, (*s)[index].URL)
 					return
 				}
@@ -211,26 +209,24 @@ func (s *Slack) send(monitorID string, svc *Service, message string) error {
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
 		// If verbose or above, print the error every time
-		if *logLevel > 2 {
-			log.Printf("ERROR: %s (%s), Slack\n%s", svc.ID, monitorID, err)
-		}
+		msg := fmt.Sprintf("%s (%s), Slack\n%s", svc.ID, monitorID, err)
+		logVerbose(*logLevel, msg, true)
 		return err
 	}
 	defer resp.Body.Close()
 
 	// SUCCESS (2XX)
 	if strconv.Itoa(resp.StatusCode)[:1] == "2" {
-		if *logLevel > 1 {
-			log.Printf("INFO: %s (%s), Slack message sent", svc.ID, monitorID)
-		}
+
+		msg := fmt.Sprintf("%s (%s), Slack message sent", svc.ID, monitorID)
+		logInfo(*logLevel, msg, true)
 		return nil
 	}
 
 	// FAIL
 	body, _ := ioutil.ReadAll(resp.Body)
 	// If verbose or above, print the error every time
-	if *logLevel > 2 {
-		log.Printf("ERROR: %s (%s), Slack request didn't 2XX\n%s\n%s", svc.ID, monitorID, resp.Status, body)
-	}
+	msg := fmt.Sprintf("%s (%s), Slack request didn't 2XX\n%s\n%s", svc.ID, monitorID, resp.Status, body)
+	logVerbose(*logLevel, msg, true)
 	return fmt.Errorf("%s. %s", resp.Status, body)
 }

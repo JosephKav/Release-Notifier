@@ -145,9 +145,8 @@ func (w *WebHookSlice) send(monitorID string, serviceID string, slacks SlackSlic
 
 			// Delay sending the Slack message by the defined interval.
 			sleepTime, _ := time.ParseDuration((*w)[index].Delay)
-			if sleepTime != 0 && *logLevel > 1 {
-				log.Printf("INFO: %s (%s), Sleeping for %s before sending the WebHook", serviceID, monitorID, (*w)[index].Delay)
-			}
+			msg := fmt.Sprintf("%s (%s), Sleeping for %s before sending the WebHook", serviceID, monitorID, (*w)[index].Delay)
+			logInfo(*logLevel, msg, (sleepTime != 0))
 			time.Sleep(sleepTime)
 
 			for {
@@ -163,9 +162,8 @@ func (w *WebHookSlice) send(monitorID string, serviceID string, slacks SlackSlic
 				// Give up after MaxTries.
 				if triesLeft == 0 {
 					// If not verbose or above (above, this would already have been printed).
-					if *logLevel < 3 {
-						log.Printf("ERROR: %s (%s), %s", serviceID, monitorID, err)
-					}
+					msg := fmt.Sprintf("%s (%s), %s", serviceID, monitorID, err)
+					logError(msg, (*logLevel < 3))
 					message := fmt.Sprintf("%s, Failed %d times to send a WebHook to %s", monitorID, (*w)[index].MaxTries, (*w)[index].URL)
 					if (*w)[index].SilentFails == "n" {
 						svc := Service{
@@ -223,18 +221,16 @@ func (w *WebHook) send(monitorID string, serviceID string) error {
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
 		// If verbose or above, print the error every time
-		if *logLevel > 2 {
-			log.Printf("ERROR: %s (%s), WebHook:\n%s", serviceID, monitorID, err)
-		}
+		msg := fmt.Sprintf("%s (%s), WebHook:\n%s", serviceID, monitorID, err)
+		logError(msg, (*logLevel > 2))
 		return err
 	}
 	defer resp.Body.Close()
 
 	// SUCCESS
 	if resp.StatusCode == w.DesiredStatusCode || (w.DesiredStatusCode == 0 && (strconv.Itoa(resp.StatusCode)[:1] == "2")) {
-		if *logLevel > 1 {
-			log.Printf("INFO: %s (%s), (%d) WebHook received", serviceID, monitorID, resp.StatusCode)
-		}
+		msg := fmt.Sprintf("%s (%s), (%d) WebHook received", serviceID, monitorID, resp.StatusCode)
+		logInfo(*logLevel, msg, true)
 		return nil
 	}
 
@@ -248,8 +244,7 @@ func (w *WebHook) send(monitorID string, serviceID string) error {
 	}
 
 	// If verbose or above, print the error every time
-	if *logLevel > 2 {
-		log.Printf("ERROR:  %s (%s), WebHook didn't %s:\n%s\n%s", serviceID, monitorID, desiredStatusCode, resp.Status, body)
-	}
+	msg := fmt.Sprintf("%s (%s), WebHook didn't %s:\n%s\n%s", serviceID, monitorID, desiredStatusCode, resp.Status, body)
+	logError(msg, (*logLevel > 2))
 	return fmt.Errorf("%s, %s", resp.Status, body)
 }

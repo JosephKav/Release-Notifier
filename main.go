@@ -124,7 +124,7 @@ func (c *Config) print() {
 // SetLogLevel will set logLevel to value if that's in the acceptable range, 2 otherwise
 func SetLogLevel(value int) {
 	if value > 4 || value < 0 {
-		log.Println("ERROR: loglevel should be between 0 and 4 (inclusive), setting yours to 2 (info)")
+		logError("loglevel should be between 0 and 4 (inclusive), setting yours to 2 (info)", true)
 		*logLevel = 2
 	} else {
 		*logLevel = value
@@ -151,14 +151,9 @@ func main() {
 
 	flag.Parse()
 
-	if *logLevel > 4 || *logLevel < 0 {
-		log.Println("ERROR: loglevel should be between 0 and 4 (inclusive), setting yours to 2 (info)")
-		*logLevel = 2
-	}
-
-	if *logLevel > 2 {
-		log.Printf("VERBOSE: Loading config from '%s'", *configFile)
-	}
+	SetLogLevel(*logLevel)
+	msg := fmt.Sprintf(fmt.Sprintf("Loading config from '%s'", *configFile))
+	logVerbose(*logLevel, msg, true)
 
 	config.getConf(*configFile)
 	config.setDefaults()
@@ -175,12 +170,14 @@ func main() {
 	}
 
 	if serviceCount == 0 {
-		log.Printf("ERROR: Exiting as no services to monitor were found in '%s'", *configFile)
+		msg := fmt.Sprintf("Exiting as no services to monitor were found in '%s'", *configFile)
+		logError(msg, true)
 		os.Exit(1)
 	}
 
 	if *logLevel > 1 {
-		log.Printf("INFO: %d targets with %d services to monitor:", len(config.Monitor), serviceCount)
+		msg := fmt.Sprintf("%d targets with %d services to monitor:", len(config.Monitor), serviceCount)
+		logInfo(*logLevel, msg, true)
 
 		for _, monitor := range config.Monitor {
 			if len(monitor.Service) == 1 {
