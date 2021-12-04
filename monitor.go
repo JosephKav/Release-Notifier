@@ -37,7 +37,7 @@ func (m *Monitor) print() {
 		fmt.Printf("        type: %s\n", service.Type)
 		fmt.Printf("        url: '%s'\n", service.URL)
 		service.URLCommands.print("        ")
-		fmt.Printf("        interval: %d\n", service.Interval)
+		fmt.Printf("        interval: %s\n", service.Interval)
 		fmt.Printf("        regex_content: %s\n", service.RegexContent)
 		fmt.Printf("        regex_version: %s\n", service.RegexVersion)
 		fmt.Printf("        progressive_versioning: %s\n", service.ProgressiveVersioning)
@@ -68,7 +68,6 @@ func (m *Monitor) print() {
 		fmt.Printf("        desired_status_code: %d\n", webhook.DesiredStatusCode)
 		fmt.Printf("        delay: %s\n", webhook.Delay)
 		fmt.Printf("        max_tries: %d\n", webhook.MaxTries)
-		fmt.Printf("        delay: %s\n", webhook.Delay)
 		fmt.Printf("        silent_fails: %s\n", webhook.SilentFails)
 	}
 }
@@ -80,7 +79,7 @@ func (m *MonitorSlice) track() {
 	for monitorIndex := range *m {
 		for serviceIndex := range (*m)[monitorIndex].Service {
 			if *logLevel > 2 {
-				log.Printf("VERBOSE: Tracking %s at %s every %d seconds", (*m)[monitorIndex].Service[serviceIndex].ID, (*m)[monitorIndex].Service[serviceIndex].URL, (*m)[monitorIndex].Service[serviceIndex].Interval)
+				log.Printf("VERBOSE: Tracking %s at %s every %s", (*m)[monitorIndex].Service[serviceIndex].ID, (*m)[monitorIndex].Service[serviceIndex].URL, (*m)[monitorIndex].Service[serviceIndex].Interval)
 			}
 
 			// Track this Service in a infinite loop goroutine.
@@ -113,6 +112,7 @@ func (m *Monitor) track(serviceIndex int) {
 		}
 
 		// Sleep interval between checks.
-		time.Sleep(time.Duration(m.Service[serviceIndex].Interval) * time.Second)
+		sleepTime, _ := time.ParseDuration(m.Service[serviceIndex].Interval)
+		time.Sleep(sleepTime)
 	}
 }

@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"os"
 	"regexp"
+	"strconv"
 	"strings"
 	"time"
 
@@ -24,7 +25,7 @@ type Service struct {
 	Type                  string          `yaml:"type"`                   // "github"/"URL"
 	URL                   string          `yaml:"url"`                    // type:URL - "https://example.com", type:github - "owner/repo" or "https://github.com/owner/repo".
 	URLCommands           URLCommandSlice `yaml:"url_commands"`           // Commands to filter the release from the URL request.
-	Interval              uint            `yaml:"interval"`               // 600 = Sleep 600 seconds between queries.
+	Interval              string          `yaml:"interval"`               // AhBmCs = Sleep A hours, B minutes and C seconds between queries.
 	ProgressiveVersioning string          `yaml:"progressive_versioning"` // default - true  = Version has to be greater than the previous to trigger Slack(s)/WebHook(s).
 	RegexContent          string          `yaml:"regex_content"`          // "abc-[a-z]+-${version}_amd64.deb" This regex must exist in the body of the URL to trigger new version actions.
 	RegexVersion          string          `yaml:"regex_version"`          // "v*[0-9.]+" The version found must match this release to trigger new version actions.
@@ -87,13 +88,13 @@ func (c *URLCommandSlice) UnmarshalYAML(unmarshal func(interface{}) error) error
 }
 
 // print will print the URLCommand's in the URLCommandSlice
-func (u *URLCommandSlice) print(prefix string) {
+func (c *URLCommandSlice) print(prefix string) {
 	noCmds := ""
-	if len(*u) == 0 {
+	if len(*c) == 0 {
 		noCmds = " []"
 	}
 	fmt.Printf("%surl_commands:%s\n", prefix, noCmds)
-	for _, command := range *u {
+	for _, command := range *c {
 		command.print(prefix)
 	}
 }
@@ -110,39 +111,56 @@ type URLCommand struct {
 }
 
 // print will print the URLCommand
-func (u *URLCommand) print(prefix string) {
-	fmt.Printf("%s  - type: %s\n", prefix, u.Type)
-	switch u.Type {
+func (c *URLCommand) print(prefix string) {
+	fmt.Printf("%s  - type: %s\n", prefix, c.Type)
+	switch c.Type {
 	case "regex":
-		fmt.Printf("%s    regex: '%s'\n", prefix, u.Regex)
-		fmt.Printf("%s    ignore_misses: %s\n", prefix, u.IgnoreMiss)
+		fmt.Printf("%s    regex: '%s'\n", prefix, c.Regex)
+		fmt.Printf("%s    ignore_misses: %s\n", prefix, c.IgnoreMiss)
 	case "regex_submatch":
-		fmt.Printf("%s    regex: '%s'\n", prefix, u.Regex)
-		fmt.Printf("%s    index: %d\n", prefix, u.Index)
-		fmt.Printf("%s    ignore_misses: %s\n", prefix, u.IgnoreMiss)
+		fmt.Printf("%s    regex: '%s'\n", prefix, c.Regex)
+		fmt.Printf("%s    index: %d\n", prefix, c.Index)
+		fmt.Printf("%s    ignore_misses: %s\n", prefix, c.IgnoreMiss)
 	case "replace":
-		fmt.Printf("%s    new: '%s'\n", prefix, u.New)
-		fmt.Printf("%s    old: '%s'\n", prefix, u.Old)
+		fmt.Printf("%s    new: '%s'\n", prefix, c.New)
+		fmt.Printf("%s    old: '%s'\n", prefix, c.Old)
 	case "split":
-		fmt.Printf("%s    text: '%s'\n", prefix, u.Text)
-		fmt.Printf("%s    index: %d\n", prefix, u.Index)
-		fmt.Printf("%s    ignore_misses: %s\n", prefix, u.IgnoreMiss)
+		fmt.Printf("%s    text: '%s'\n", prefix, c.Text)
+		fmt.Printf("%s    index: %d\n", prefix, c.Index)
+		fmt.Printf("%s    ignore_misses: %s\n", prefix, c.IgnoreMiss)
 	}
 }
 
-// checkValues will check the variables for all of this services Slack recipients.
-func (s *ServiceSlice) checkValues(serviceID string) {
+// checkValues will check the variables for the Service's in the ServiceSlice.
+func (s *ServiceSlice) checkValues(monitorID string) {
 	for index := range *s {
-		(*s)[index].checkValues(serviceID, index)
+		(*s)[index].checkValues(monitorID, index, len(*s) == 1)
 	}
 }
 
-// checkValues will check that the variables are valid for this Slack recipient.
-func (s *Service) checkValues(serviceID string, index int) {
+// checkValues will check the variables for the Service.
+func (s *Service) checkValues(monitorID string, index int, loneService bool) {
+	target := monitorID
+	if !loneService {
+		target = fmt.Sprintf("%s[%d]", monitorID, index)
+	}
+
+	// Interval
+	if s.Interval != "" {
+		// Default to seconds when an integer is provided
+		if _, err := strconv.Atoi(s.Interval); err == nil {
+			s.Interval += "s"
+		}
+		if _, err := time.ParseDuration(s.Interval); err != nil {
+			fmt.Printf("ERROR: %s.interval (%s) is invalid (Use 'AhBmCs' duration format)", target, s.Interval)
+			os.Exit(1)
+		}
+	}
+
+	// Slack - Delay
 	if s.Slack.Delay != "" {
-		_, err := time.ParseDuration(s.Slack.Delay)
-		if err != nil {
-			fmt.Printf("ERROR: %s.slack[%d].delay (%s) is invalid (Use 'AhBmCs' duration format)", serviceID, index, s.Slack.Delay)
+		if _, err := time.ParseDuration(s.Slack.Delay); err != nil {
+			fmt.Printf("ERROR: %s.slack.delay (%s) is invalid (Use 'AhBmCs' duration format)", target, s.Slack.Delay)
 			os.Exit(1)
 		}
 	}
@@ -162,10 +180,11 @@ func (s *status) init() {
 }
 
 // setDefaults sets undefined variables to their default.
-func (s *ServiceSlice) setDefaults(defaults Defaults) {
+func (s *ServiceSlice) setDefaults(monitorID string, defaults Defaults) {
 	for index := range *s {
 		(*s)[index].setDefaults(defaults)
 	}
+	(*s).checkValues(monitorID)
 }
 
 // setDefaults sets undefined variables to their default.
@@ -218,7 +237,7 @@ func (s *Service) setDefaults(defaults Defaults) {
 	}
 
 	// Default Interval.
-	s.Interval = valueOrValueUInt(s.Interval, defaults.Service.Interval)
+	s.Interval = valueOrValueString(s.Interval, defaults.Service.Interval)
 
 	// Default Type.
 	if s.Type == "" {
@@ -538,8 +557,7 @@ func (s *Service) query(index int, monitorID string) bool {
 		// First version found.
 		if s.status.version == "" {
 			if s.ProgressiveVersioning == "y" {
-				_, err := semver.NewVersion(version)
-				if err != nil {
+				if _, err := semver.NewVersion(version); err != nil {
 					log.Printf("ERROR: %s (%s), failed converting '%s' to a semantic version. If all versions are in this style, consider adding url_commands to get the version into the style of '1.2.3a' (https://semver.org/), or disabling progressive versioning (globally with defaults.service.progressive_versioning or just for this service with the progressive_versioning var)", s.ID, monitorID, version)
 					return false
 				}

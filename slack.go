@@ -52,10 +52,11 @@ func (s *SlackSlice) UnmarshalYAML(unmarshal func(interface{}) error) error {
 }
 
 // setDefaults sets undefined variables to their default.
-func (s *SlackSlice) setDefaults(defaults Defaults) {
+func (s *SlackSlice) setDefaults(monitorID string, defaults Defaults) {
 	for SlackIndex := range *s {
 		(*s)[SlackIndex].setDefaults(defaults)
 	}
+	(*s).checkValues(monitorID)
 }
 
 // setDefaults sets undefined variables to their default.
@@ -84,16 +85,27 @@ func (s *Slack) setDefaults(defaults Defaults) {
 // checkValues will check the variables for all of this monitors Slack recipients.
 func (s *SlackSlice) checkValues(monitorID string) {
 	for index := range *s {
-		(*s)[index].checkValues(monitorID, index)
+		(*s)[index].checkValues(monitorID, index, len(*s) == 1)
 	}
 }
 
 // checkValues will check that the variables are valid for this Slack recipient.
-func (s *Slack) checkValues(monitorID string, index int) {
-	_, err := time.ParseDuration(s.Delay)
-	if err != nil {
-		fmt.Printf("ERROR: %s.slack[%d].delay (%s) is invalid (Use 'AhBmCs' duration format)", monitorID, index, s.Delay)
-		os.Exit(1)
+func (s *Slack) checkValues(monitorID string, index int, loneService bool) {
+	target := monitorID + ".slack"
+	if !loneService {
+		target = fmt.Sprintf("%s[%d]", monitorID, index)
+	}
+
+	// Delay
+	if s.Delay != "" {
+		// Default to seconds when an integer is provided
+		if _, err := strconv.Atoi(s.Delay); err == nil {
+			s.Delay += "s"
+		}
+		if _, err := time.ParseDuration(s.Delay); err != nil {
+			fmt.Printf("ERROR: %s.delay (%s) is invalid (Use 'AhBmCs' duration format)", target, s.Delay)
+			os.Exit(1)
+		}
 	}
 }
 

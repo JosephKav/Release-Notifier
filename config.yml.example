@@ -1,6 +1,6 @@
 defaults:
   service:
-    interval: 600
+    interval: 10m
     access_token: ghp_AAAA
   slack:
     message: '<${service_url}|${service_id}> - ${version} released'
@@ -13,12 +13,14 @@ defaults:
     maxtries: 3
     delay: 0s
     silent_fails: false
+
 monitor:
   - id: Gitea
     service:
       type: github
       url: go-gitea/gitea
-      url_commands: # Remove the v for progressive versioning
+      # Remove the leading v for progressive versioning
+      url_commands:
         - type:  regex_submatch
           regex: 'v(.*)'
           index: 1

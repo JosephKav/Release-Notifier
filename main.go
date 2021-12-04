@@ -38,8 +38,9 @@ func (d *Defaults) setDefaults() {
 	// Service defaults.
 	d.Service.AllowInvalidCerts = stringBool(d.Service.AllowInvalidCerts, "", "", false)
 	d.Service.IgnoreMiss = stringBool(d.Service.IgnoreMiss, "", "", false)
-	d.Service.Interval = valueOrValueUInt(d.Service.Interval, 600)
+	d.Service.Interval = valueOrValueString(d.Service.Interval, "10m")
 	d.Service.ProgressiveVersioning = stringBool(d.Service.ProgressiveVersioning, "", "", true)
+	d.Service.checkValues("defaults", 0, true)
 
 	// Slack defaults.
 	d.Slack.Delay = valueOrValueString(d.Slack.Delay, "0s")
@@ -49,12 +50,14 @@ func (d *Defaults) setDefaults() {
 	d.Slack.MaxTries = valueOrValueUInt(d.Slack.MaxTries, 3)
 	d.Slack.Message = valueOrValueString(d.Slack.Message, "<${service_url}|${service_id}> - ${version} released")
 	d.Slack.Username = valueOrValueString(d.Slack.Username, "Release Notifier")
+	d.Slack.checkValues("defaults", 0, true)
 
 	// WebHook defaults.
 	d.WebHook.Delay = valueOrValueString(d.WebHook.Delay, "0s")
 	d.WebHook.DesiredStatusCode = valueOrValueInt(d.WebHook.DesiredStatusCode, 0)
 	d.WebHook.MaxTries = valueOrValueUInt(d.WebHook.MaxTries, 3)
 	d.WebHook.SilentFails = stringBool(d.WebHook.SilentFails, "", "", false)
+	d.WebHook.checkValues("defaults", 0, true)
 }
 
 // print will print the defaults
@@ -65,7 +68,7 @@ func (d *Defaults) print() {
 	fmt.Println("  service:")
 	fmt.Printf("    allow_invalid_certs: %s\n", d.Service.AllowInvalidCerts)
 	fmt.Printf("    ignore_miss: %s\n", d.Service.IgnoreMiss)
-	fmt.Printf("    interval: %d\n", d.Service.Interval)
+	fmt.Printf("    interval: %s\n", d.Service.Interval)
 	fmt.Printf("    progressive_versioning: %s\n", d.Service.ProgressiveVersioning)
 
 	// Slack defaults.
@@ -104,12 +107,9 @@ func (c *Config) setDefaults() *Config {
 	c.Defaults.setDefaults()
 	for monitorIndex := range c.Monitor {
 		monitor := &c.Monitor[monitorIndex]
-		monitor.Service.setDefaults(c.Defaults)
-		monitor.Service.checkValues(monitor.ID)
-		monitor.Slack.setDefaults(c.Defaults)
-		monitor.Slack.checkValues(monitor.ID)
-		monitor.WebHook.setDefaults(c.Defaults)
-		monitor.WebHook.checkValues(monitor.ID)
+		monitor.Service.setDefaults(monitor.ID, c.Defaults)
+		monitor.Slack.setDefaults(monitor.ID, c.Defaults)
+		monitor.WebHook.setDefaults(monitor.ID, c.Defaults)
 	}
 	return c
 }

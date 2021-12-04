@@ -35,15 +35,15 @@ $ release_notifier -config myConfig.yml -loglevel 3
 2021/11/08 02:18:24       - gohugoio/hugo
 2021/11/08 02:18:24       - adnanh/webhook
 2021/11/08 02:18:24   - louislam/uptime-kuma
-2021/11/08 02:18:24 VERBOSE: Tracking goauthentik/authentik at https://api.github.com/repos/goauthentik/authentik/releases/latest every 600 seconds
+2021/11/08 02:18:24 VERBOSE: Tracking goauthentik/authentik at https://api.github.com/repos/goauthentik/authentik/releases/latest every 10m
 2021/11/08 02:18:24 INFO: goauthentik/authentik (Authentik), Starting Release - 2021.10.2
-2021/11/08 02:18:35 VERBOSE: Tracking ansible/awx-operator at https://api.github.com/repos/ansible/awx-operator/releases/latest every 600 seconds
+2021/11/08 02:18:35 VERBOSE: Tracking ansible/awx-operator at https://api.github.com/repos/ansible/awx-operator/releases/latest every 10m
 2021/11/08 02:18:35 INFO: ansible/awx-operator (AWX), Starting Release - 0.14.0
-2021/11/08 02:18:52 VERBOSE: Tracking gohugoio/hugo at https://api.github.com/repos/gohugoio/hugo/releases/latest every 600 seconds
+2021/11/08 02:18:52 VERBOSE: Tracking gohugoio/hugo at https://api.github.com/repos/gohugoio/hugo/releases/latest every 10m
 2021/11/08 02:18:52 INFO: gohugoio/hugo (CV-Site), Starting Release - 0.89.1
-2021/11/08 02:19:09 VERBOSE: Tracking adnanh/webhook at https://api.github.com/repos/adnanh/webhook/releases/latest every 600 seconds
+2021/11/08 02:19:09 VERBOSE: Tracking adnanh/webhook at https://api.github.com/repos/adnanh/webhook/releases/latest every 10m
 2021/11/08 02:19:09 INFO: adnanh/webhook (CV-Site), Starting Release - 2.8.0
-2021/11/08 02:19:28 VERBOSE: Tracking louislam/uptime-kuma at https://api.github.com/repos/louislam/uptime-kuma/releases/latest every 600 seconds
+2021/11/08 02:19:28 VERBOSE: Tracking louislam/uptime-kuma at https://api.github.com/repos/louislam/uptime-kuma/releases/latest every 10m
 2021/11/08 02:19:28 INFO: louislam/uptime-kuma (Uptime-Kuma), Starting Release - 1.10.0
 2021/11/08 10:11:58 INFO: louislam/uptime-kuma (Uptime-Kuma), New Release - 1.10.1
 2021/11/08 10:11:58 INFO: louislam/uptime-kuma (Uptime-Kuma), Slack message sent
@@ -81,7 +81,7 @@ Usage of /usr/local/bin/release_notifier:
 ```yaml
 defaults:
   service:
-    interval: 600
+    interval: 10m
     access_token: 'GITHUB_ACCESS_TOKEN'
     progressive_versioning: true
     allow_invalid: false
@@ -112,7 +112,7 @@ monitor:
             index: 0
       - type: github
         url: adnanh/webhook
-        interval: 300
+        interval: 300s
     webhook:
       type: github
       url: https://AWX_HOSTNAME/api/v2/job_templates/35/github/
@@ -121,7 +121,7 @@ monitor:
       url: https://SLACK_INCOMING_WEBHOOK
       delay: 5s
 ```
-Above, I set defaults.service.interval to 600 and then don't define an interval for the golang/go service. Therefore, the monitor for this service will follow defaults.service.interval and query the site every 600 seconds. But, I can override that interval by stating it, for example in the adnanh/webhook service, I have set interval to 300 and so that page will be queried every 300 seconds. The defaults.webhook.delay of 1h5m4s will delay sending the webhook by 1 hour, 2 minutes and 3 seconds when a version change is noticed. The CV-Site slack messages will be delayed by 5 seconds since the slack.delay overrides defaults.slack.delay.
+Above, I set defaults.service.interval to 10m and then don't define an interval for the golang/go service. Therefore, the monitor for this service will follow defaults.service.interval and query the site every 10m. But, I can override that interval by stating it, for example in the adnanh/webhook service, I have set interval to 300s and so that page will be queried every 300 seconds. The defaults.webhook.delay of 1h5m4s will delay sending the webhook by 1 hour, 2 minutes and 3 seconds when a version change is noticed. The CV-Site slack messages will be delayed by 5 seconds since the slack.delay overrides defaults.slack.delay.
 
 #### Defaults
 Defaults are not needed in the config, but you can override the coded defaults with your own defaults for service, webhook and slack in this defaults section. You could for example have a tiny defaults section that only has `defaults -> slack -> username: 'USERNAME'`, you do not need to define all values for a section. In the examples below, the values set are the coded defaults that will be used if they haven't been included in the service being monitored or the config defaults. (excluding access_token)
@@ -130,7 +130,7 @@ Defaults are not needed in the config, but you can override the coded defaults w
 ```yaml
 defaults:
   service:
-    interval: 600
+    interval: 10m
     access_token: 'GITHUB_ACCESS_TOKEN'
     progressive_versioning: true
     allow_invalid: false
@@ -153,7 +153,7 @@ defaults:
 ```yaml
 defaults:
   service:
-    interval: 600                       # Time between monitor queries.
+    interval: 10m                       # Time between monitor queries.
     access_token: 'GITHUB_ACCESS_TOKEN' # Increase API rate limit with an access token (and allow querying private repos). Used when type="github".
     progressive_versioning: true        # Only send Slack(s) and/or WebHook(s) when the version increases (semantic versioning - e.g. v1.2.3a).
     allow_invalid: false                # Allow invalid HTTPS Certificates.
@@ -207,7 +207,7 @@ monitor:
             index: -1
       - type: github
         url: adnanh/webhook
-        interval: 345
+        interval: 345s
     slack:
       - url: https://SLACK_INCOMING_WEBHOOK
         delay: 5h5m5m
@@ -257,7 +257,7 @@ monitor:
       access_token: 'GITHUB_ACCESS_TOKEN'              # Optional. GitHub access token to use. Allows smaller interval (higher API rate limit).
       skip_slack: false                                # Optional. Don't send Slack messages for new releases of this service.
       skip_webhook: false                              # Optional. Don't send WebHooks for new releases of this service.
-      interval: 600                                    # Optional. Amount of seconds to sleep between querying the URL for the version.
+      interval: 10m                                    # Optional. The duration (AhBmCs where h is hours, m is minutes and s is seconds) to sleep between querying the URL for the version.
 ```
 The values of the optional boolean arguments are the default values.
 

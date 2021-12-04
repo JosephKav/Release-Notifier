@@ -7,12 +7,13 @@ defaults:
     username: 'Release Notifier'
     icon_emoji: ':github_background:'
     maxtries: 3
-    delay: 1s
+    delay: 1
   webhook:
     desired_status_code: 0
     maxtries: 3
-    delay: 2s
+    delay: 2
     silent_fails: false
+
 monitor:
   - id: NoDefaults
     service:
@@ -22,7 +23,7 @@ monitor:
         - type:  regex_submatch
           regex: 'v(.*)'
           index: 1
-      interval: 600
+      interval: 10m
       regex_version: '^[0-9.]+[0-9]$'
       regex_content: Release-Notifier-${version_no_v}-linux-amd64
     webhook:

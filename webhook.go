@@ -56,10 +56,11 @@ func (w *WebHookSlice) UnmarshalYAML(unmarshal func(interface{}) error) error {
 }
 
 // setDefaults sets undefined variables to their default.
-func (w *WebHookSlice) setDefaults(defaults Defaults) {
+func (w *WebHookSlice) setDefaults(monitorID string, defaults Defaults) {
 	for index := range *w {
 		(*w)[index].setDefaults(defaults)
 	}
+	(*w).checkValues(monitorID)
 }
 
 // setDefaults sets undefined variables to their default.
@@ -81,16 +82,27 @@ func (w *WebHook) setDefaults(defaults Defaults) {
 // checkValues will check the variables for all of this Monitor's WebHook recipients.
 func (w *WebHookSlice) checkValues(monitorID string) {
 	for index := range *w {
-		(*w)[index].checkValues(monitorID, index)
+		(*w)[index].checkValues(monitorID, index, len(*w) == 1)
 	}
 }
 
 // checkValues will check that the variables are valid for this WebHook recipient.
-func (w *WebHook) checkValues(monitorID string, index int) {
-	_, err := time.ParseDuration(w.Delay)
-	if err != nil {
-		fmt.Printf("ERROR: %s.webhook[%d].delay (%s) is invalid (Use 'AhBmCs' duration format)", monitorID, index, w.Delay)
-		os.Exit(1)
+func (w *WebHook) checkValues(monitorID string, index int, loneService bool) {
+	target := monitorID + ".webhook"
+	if !loneService {
+		target = fmt.Sprintf("%s[%d]", monitorID, index)
+	}
+
+	// Delay
+	if w.Delay != "" {
+		// Default to seconds when an integer is provided
+		if _, err := strconv.Atoi(w.Delay); err == nil {
+			w.Delay += "s"
+		}
+		if _, err := time.ParseDuration(w.Delay); err != nil {
+			fmt.Printf("ERROR: %s.delay (%s) is invalid (Use 'AhBmCs' duration format)", target, w.Delay)
+			os.Exit(1)
+		}
 	}
 }
 
