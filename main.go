@@ -152,7 +152,7 @@ func main() {
 	flag.Parse()
 
 	SetLogLevel(*logLevel)
-	msg := fmt.Sprintf(fmt.Sprintf("Loading config from '%s'", *configFile))
+	msg := fmt.Sprintf("Loading config from '%s'", *configFile)
 	logVerbose(*logLevel, msg, true)
 
 	config.getConf(*configFile)
