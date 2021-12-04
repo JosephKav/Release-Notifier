@@ -10,14 +10,14 @@ import (
 	"flag"
 	"fmt"
 	"io/ioutil"
-	"log"
 	"os"
 
 	"gopkg.in/yaml.v3"
 )
 
 var (
-	logLevel = flag.Int("loglevel", 2, "0 = error, 1 = warn,\n2 = info,  3 = verbose,\n4 = debug")
+	logLevel   = flag.Int("loglevel", 2, "0 = error, 1 = warn,\n2 = info,  3 = verbose,\n4 = debug")
+	timestamps = flag.Bool("timestamps", false, "Use to enable timestamps in cli output")
 )
 
 // Config is the config for Release-Notifier.
@@ -91,14 +91,12 @@ func (d *Defaults) print() {
 // getConf reads file as Config.
 func (c *Config) getConf(file string) *Config {
 	data, err := ioutil.ReadFile(file)
-	if err != nil {
-		log.Printf("ERROR: data.Get err\n%v ", err)
-	}
+	msg := fmt.Sprintf("ERROR: data.Get err\n%s ", err)
+	logError(msg, err != nil)
 
 	err = yaml.Unmarshal(data, c)
-	if err != nil {
-		log.Fatalf("ERROR: Unmarshal\n%v", err)
-	}
+	msg = fmt.Sprintf("ERROR: Unmarshal\n%s", err)
+	logFatal(msg, err != nil)
 	return c
 }
 
@@ -144,9 +142,9 @@ func configPrint(flag *bool, cfg *Config) {
 // on them as defined.
 func main() {
 	var (
+		config          Config
 		configFile      = flag.String("config", "config.yml", "The path to the config file to use") // "path/to/config.yml"
 		configPrintFlag = flag.Bool("config-check", false, "Use to print the fully-parsed config")
-		config          Config
 	)
 
 	flag.Parse()
@@ -181,11 +179,11 @@ func main() {
 
 		for _, monitor := range config.Monitor {
 			if len(monitor.Service) == 1 {
-				log.Printf("  - %s", monitor.Service[0].ID)
+				fmt.Printf("  - %s\n", monitor.Service[0].ID)
 			} else {
-				log.Printf("  - %s:", monitor.ID)
+				fmt.Printf("  - %s:\n", monitor.ID)
 				for _, service := range monitor.Service {
-					log.Printf("      - %s", service.ID)
+					fmt.Printf("      - %s\n", service.ID)
 				}
 			}
 		}

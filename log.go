@@ -1,6 +1,10 @@
 package main
 
-import "log"
+import (
+	"fmt"
+	"log"
+	"os"
+)
 
 // logLevel
 // 0 = error  1 = warn,
@@ -12,7 +16,11 @@ import "log"
 // (if otherCondition is true)
 func logError(msg string, otherCondition bool) {
 	if otherCondition {
-		log.Printf("ERROR: %s", msg)
+		if *timestamps {
+			log.Printf("ERROR %s\n", msg)
+		} else {
+			fmt.Printf("ERROR: %s\n", msg)
+		}
 	}
 }
 
@@ -21,7 +29,11 @@ func logError(msg string, otherCondition bool) {
 // (if otherCondition is true)
 func logWarn(loglevel int, msg string, otherCondition bool) {
 	if *logLevel > 0 && otherCondition {
-		log.Printf("WARNING: %s", msg)
+		if *timestamps {
+			log.Printf("WARNING: %s\n", msg)
+		} else {
+			fmt.Printf("WARNING: %s\n", msg)
+		}
 	}
 }
 
@@ -30,7 +42,11 @@ func logWarn(loglevel int, msg string, otherCondition bool) {
 // (if otherCondition is true)
 func logInfo(loglevel int, msg string, otherCondition bool) {
 	if *logLevel > 1 && otherCondition {
-		log.Printf("INFO: %s", msg)
+		if *timestamps {
+			log.Printf("INFO: %s\n", msg)
+		} else {
+			fmt.Printf("INFO: %s\n", msg)
+		}
 	}
 }
 
@@ -39,7 +55,11 @@ func logInfo(loglevel int, msg string, otherCondition bool) {
 // (if otherCondition is true)
 func logVerbose(loglevel int, msg string, otherCondition bool) {
 	if *logLevel > 2 && otherCondition {
-		log.Printf("VERBOSE: %s", msg)
+		if *timestamps {
+			log.Printf("VERBOSE: %s\n", msg)
+		} else {
+			fmt.Printf("VERBOSE: %s\n", msg)
+		}
 	}
 }
 
@@ -48,6 +68,18 @@ func logVerbose(loglevel int, msg string, otherCondition bool) {
 // (if otherCondition is true)
 func logDebug(loglevel int, msg string, otherCondition bool) {
 	if *logLevel == 4 && otherCondition {
-		log.Printf("DEBUG: %s", msg)
+		if *timestamps {
+			log.Printf("DEBUG: %s\n", msg)
+		} else {
+			fmt.Printf("DEBUG: %s\n", msg)
+		}
+	}
+}
+
+// logFatal is equivalent to logError() followed by a call to os.Exit(1).
+func logFatal(msg string, otherCondition bool) {
+	if otherCondition {
+		logError(msg, true)
+		os.Exit(1)
 	}
 }

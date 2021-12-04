@@ -10,10 +10,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
-	"log"
 	"math/rand"
 	"net/http"
-	"os"
 	"strconv"
 	"time"
 )
@@ -100,8 +98,8 @@ func (w *WebHook) checkValues(monitorID string, index int, loneService bool) {
 			w.Delay += "s"
 		}
 		if _, err := time.ParseDuration(w.Delay); err != nil {
-			fmt.Printf("ERROR: %s.delay (%s) is invalid (Use 'AhBmCs' duration format)", target, w.Delay)
-			os.Exit(1)
+			msg := fmt.Sprintf("%s.delay (%s) is invalid (Use 'AhBmCs' duration format)", target, w.Delay)
+			logFatal(msg, true)
 		}
 	}
 }
@@ -171,7 +169,8 @@ func (w *WebHookSlice) send(monitorID string, serviceID string, slacks SlackSlic
 						}
 						slacks.send(monitorID, &svc, message)
 					}
-					log.Printf("ERROR: %s (%s), %s", serviceID, monitorID, message)
+					msg = fmt.Sprintf("%s (%s), %s", serviceID, monitorID, message)
+					logError(msg, true)
 					break
 				}
 				// Space out retries.

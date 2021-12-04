@@ -5,9 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"io/ioutil"
-	"log"
 	"net/http"
-	"os"
 	"regexp"
 	"strconv"
 	"strings"
@@ -273,7 +271,8 @@ func (c *URLCommand) checkValues(monitorID string, serviceID string) {
 	switch c.Type {
 	case "split", "replace", "regex", "regex_submatch":
 	default:
-		log.Printf("ERROR: %s (%s), %s is an unknown type for url_commands", serviceID, monitorID, c.Type)
+		msg := fmt.Sprintf("%s (%s), %s is an unknown type for url_commands", serviceID, monitorID, c.Type)
+		logFatal(msg, true)
 	}
 }
 
@@ -300,16 +299,16 @@ func (s *Service) checkValues(monitorID string, index int, loneService bool) {
 			s.Interval += "s"
 		}
 		if _, err := time.ParseDuration(s.Interval); err != nil {
-			fmt.Printf("ERROR: %s.interval (%s) is invalid (Use 'AhBmCs' duration format)", target, s.Interval)
-			os.Exit(1)
+			msg := fmt.Sprintf("%s.interval (%s) is invalid (Use 'AhBmCs' duration format)", target, s.Interval)
+			logFatal(msg, true)
 		}
 	}
 
 	// Slack - Delay
 	if s.Slack.Delay != "" {
 		if _, err := time.ParseDuration(s.Slack.Delay); err != nil {
-			fmt.Printf("ERROR: %s.slack.delay (%s) is invalid (Use 'AhBmCs' duration format)", target, s.Slack.Delay)
-			os.Exit(1)
+			msg := fmt.Sprintf("%s.slack.delay (%s) is invalid (Use 'AhBmCs' duration format)", target, s.Slack.Delay)
+			logFatal(msg, true)
 		}
 	}
 }
@@ -478,7 +477,8 @@ func (s *Service) query(index int, monitorID string) bool {
 	}
 	req, err := http.NewRequest(http.MethodGet, s.URL, nil)
 	if err != nil {
-		log.Printf("ERROR: %s, %s", s.ID, err)
+		msg := fmt.Sprintf("%s, %s", s.ID, err)
+		logError(msg, true)
 		return false
 	}
 
@@ -504,7 +504,8 @@ func (s *Service) query(index int, monitorID string) bool {
 	// Read the response body.
 	rawBody, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
-		log.Printf("ERROR: %s (%s), %s", s.ID, monitorID, err)
+		msg := fmt.Sprintf("%s (%s), %s", s.ID, monitorID, err)
+		logError(msg, true)
 		return false
 	}
 	// Convert the body to string.
@@ -516,11 +517,11 @@ func (s *Service) query(index int, monitorID string) bool {
 		// Check for rate limit.
 		if len(body) < 500 {
 			if !strings.Contains(body, `"tag_name"`) {
-				if strings.Contains(body, "Bad credentials") {
-					log.Println("ERROR: GitHub Access Token is invalid!")
-					os.Exit(1)
-				}
-				log.Printf("ERROR: tag_name not found for %s (%s) at %s\n%s", s.ID, monitorID, s.URL, body)
+				msg := "GitHub Access Token is invalid!"
+				logFatal(msg, strings.Contains(body, "Bad credentials"))
+
+				msg = fmt.Sprintf("tag_name not found for %s (%s) at %s\n%s", s.ID, monitorID, s.URL, body)
+				logError(msg, true)
 				return false
 			}
 			if strings.Contains(body, "rate limit") {
@@ -549,12 +550,14 @@ func (s *Service) query(index int, monitorID string) bool {
 			failedSemanticVersioning := false
 			oldVersion, err := semver.NewVersion(s.status.version)
 			if err != nil {
-				log.Printf("ERROR: %s (%s), failed converting '%s' to a semantic version", s.ID, monitorID, s.status.version)
+				msg := fmt.Sprintf("%s (%s), failed converting '%s' to a semantic version", s.ID, monitorID, s.status.version)
+				logError(msg, true)
 				failedSemanticVersioning = true
 			}
 			newVersion, err := semver.NewVersion(version)
 			if err != nil {
-				log.Printf("ERROR: %s (%s), failed converting '%s' to a semantic version", s.ID, monitorID, version)
+				msg := fmt.Sprintf("%s (%s), failed converting '%s' to a semantic version", s.ID, monitorID, version)
+				logError(msg, true)
 				failedSemanticVersioning = true
 			}
 
@@ -596,8 +599,8 @@ func (s *Service) query(index int, monitorID string) bool {
 		if s.status.version == "" {
 			if s.ProgressiveVersioning == "y" {
 				if _, err := semver.NewVersion(version); err != nil {
-					log.Printf("ERROR: %s (%s), failed converting '%s' to a semantic version. If all versions are in this style, consider adding url_commands to get the version into the style of '1.2.3a' (https://semver.org/), or disabling progressive versioning (globally with defaults.service.progressive_versioning or just for this service with the progressive_versioning var)", s.ID, monitorID, version)
-					return false
+					msg := fmt.Sprintf("%s (%s), failed converting '%s' to a semantic version. If all versions are in this style, consider adding url_commands to get the version into the style of '1.2.3a' (https://semver.org/), or disabling progressive versioning (globally with defaults.service.progressive_versioning or just for this service with the progressive_versioning var)", s.ID, monitorID, version)
+					logFatal(msg, true)
 				}
 			}
 

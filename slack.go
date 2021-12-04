@@ -6,9 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
-	"log"
 	"net/http"
-	"os"
 	"strconv"
 	"strings"
 	"time"
@@ -103,8 +101,8 @@ func (s *Slack) checkValues(monitorID string, index int, loneService bool) {
 			s.Delay += "s"
 		}
 		if _, err := time.ParseDuration(s.Delay); err != nil {
-			fmt.Printf("ERROR: %s.delay (%s) is invalid (Use 'AhBmCs' duration format)", target, s.Delay)
-			os.Exit(1)
+			msg := fmt.Sprintf("%s.delay (%s) is invalid (Use 'AhBmCs' duration format)", target, s.Delay)
+			logFatal(msg, true)
 		}
 	}
 }
@@ -138,7 +136,8 @@ func (s *SlackSlice) send(monitorID string, svc *Service, message string) {
 				if err == nil {
 					return
 				}
-				log.Printf("ERROR: %s (%s), Sending Slack failed.\n%v", svc.ID, monitorID, err)
+				msg := fmt.Sprintf("ERROR: %s (%s), Sending Slack failed.\n%v", svc.ID, monitorID, err)
+				logError(msg, true)
 
 				// FAIL
 				triesLeft--
@@ -148,7 +147,8 @@ func (s *SlackSlice) send(monitorID string, svc *Service, message string) {
 					// If not verbose or above (above, this would already have been printed).
 					msg := fmt.Sprintf("%s", err)
 					logError(msg, (*logLevel < 3))
-					log.Printf("ERROR: %s (%s), Failed %d times to send a slack message to %s", svc.ID, monitorID, (*s)[index].MaxTries, (*s)[index].URL)
+					msg = fmt.Sprintf("%s (%s), Failed %d times to send a slack message to %s", svc.ID, monitorID, (*s)[index].MaxTries, (*s)[index].URL)
+					logError(msg, true)
 					return
 				}
 
