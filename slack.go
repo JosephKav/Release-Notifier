@@ -19,13 +19,13 @@ type SlackSlice []Slack
 
 // Slack is a Slack message w/ destination and from details.
 type Slack struct {
-	URL       string `yaml:"url"`        // "https://example.com
-	IconEmoji string `yaml:"icon_emoji"` // ":github:"
-	IconURL   string `yaml:"icon_url"`   // "https://github.githubassets.com/images/modules/logos_page/GitHub-Mark.png"
-	Username  string `yaml:"username"`   // "Release Notifier"
-	Message   string `yaml:"message"`    // "${service} - ${version} released"
-	Delay     string `yaml:"delay"`      // The delay before sending the Slack message.
-	MaxTries  uint   `yaml:"maxtries"`   // Number of times to attempt sending the Slack message if a 200 is not received.
+	URL       string `yaml:"url,omitempty"`        // "https://example.com
+	IconEmoji string `yaml:"icon_emoji,omitempty"` // ":github:"
+	IconURL   string `yaml:"icon_url,omitempty"`   // "https://github.githubassets.com/images/modules/logos_page/GitHub-Mark.png"
+	Username  string `yaml:"username,omitempty"`   // "Release Notifier"
+	Message   string `yaml:"message,omitempty"`    // "${service} - ${version} released"
+	Delay     string `yaml:"delay,omitempty"`      // The delay before sending the Slack message.
+	MaxTries  uint   `yaml:"maxtries,omitempty"`   // Number of times to attempt sending the Slack message if a 200 is not received.
 }
 
 // UnmarshalYAML allows handling of a dict as well as a list of dicts.
@@ -51,29 +51,34 @@ func (s *SlackSlice) UnmarshalYAML(unmarshal func(interface{}) error) error {
 	return nil
 }
 
-// setDefaults calls setDefaults on each Slack to set the defaults for undefined values.
+// setDefaults sets undefined variables to their default.
 func (s *SlackSlice) setDefaults(defaults Defaults) {
 	for SlackIndex := range *s {
 		(*s)[SlackIndex].setDefaults(defaults)
 	}
 }
 
-// setDefaults sets the defaults for each undefined var using defaults.
+// setDefaults sets undefined variables to their default.
 func (s *Slack) setDefaults(defaults Defaults) {
-	s.Message = valueOrDefault(s.Message, defaults.Slack.Message)
+	// Delay
+	s.Delay = valueOrValueString(s.Delay, defaults.Slack.Delay)
 
-	s.Username = valueOrDefault(s.Username, defaults.Slack.Username)
-
+	// Icon
 	if s.IconEmoji == "" && s.IconURL == "" {
-		s.IconEmoji = defaults.Slack.IconEmoji
-		s.IconURL = defaults.Slack.IconURL
+		// IconEmoji
+		s.IconEmoji = valueOrValueString(s.IconEmoji, defaults.Slack.IconEmoji)
+		// IconURL
+		s.IconURL = valueOrValueString(s.IconURL, defaults.Slack.IconURL)
 	}
 
-	s.Delay = valueOrDefault(s.Delay, defaults.Slack.Delay)
+	// MaxTries
+	s.MaxTries = valueOrValueUInt(s.MaxTries, defaults.Slack.MaxTries)
 
-	if s.MaxTries == 0 {
-		s.MaxTries = defaults.Slack.MaxTries
-	}
+	// Message
+	s.Message = valueOrValueString(s.Message, defaults.Slack.Message)
+
+	// Username
+	s.Username = valueOrValueString(s.Username, defaults.Slack.Username)
 }
 
 // checkValues will check the variables for all of this monitors Slack recipients.
@@ -157,7 +162,7 @@ func (s *Slack) send(monitorID string, svc *Service, message string) error {
 
 	// Use 'new release' Slack message (Not a custom message)
 	if message == "" {
-		message = valueOrDefault(svc.Slack.Message, s.Message)
+		message = valueOrValueString(svc.Slack.Message, s.Message)
 		message = strings.ReplaceAll(message, "${monitor_id}", monitorID)
 		message = strings.ReplaceAll(message, "${service_url}", sURL)
 		message = strings.ReplaceAll(message, "${service_id}", svc.ID)
@@ -165,9 +170,9 @@ func (s *Slack) send(monitorID string, svc *Service, message string) error {
 	}
 
 	payload := SlackPayload{
-		Username:  valueOrDefault(svc.Slack.Username, s.Username),
-		IconEmoji: valueOrDefault(svc.Slack.IconEmoji, s.IconEmoji),
-		IconURL:   valueOrDefault(svc.Slack.IconURL, s.IconURL),
+		Username:  valueOrValueString(svc.Slack.Username, s.Username),
+		IconEmoji: valueOrValueString(svc.Slack.IconEmoji, s.IconEmoji),
+		IconURL:   valueOrValueString(svc.Slack.IconURL, s.IconURL),
 		Text:      message,
 	}
 	// Handle per-monitor overrides. (Ensure s.Icon* values won't be sent)

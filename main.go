@@ -8,10 +8,10 @@ package main
 
 import (
 	"flag"
+	"fmt"
 	"io/ioutil"
 	"log"
 	"os"
-	"strings"
 
 	"gopkg.in/yaml.v3"
 )
@@ -33,60 +33,56 @@ type Defaults struct {
 	WebHook WebHook `yaml:"webhook"`
 }
 
-// setDefaults will set the defaults for each undefined var.
+// setDefaults sets undefined variables to their default.
 func (d *Defaults) setDefaults() {
 	// Service defaults.
-	if strings.ToLower(d.Service.AllowInvalidCerts) == "true" || strings.ToLower(d.Service.AllowInvalidCerts) == "yes" {
-		d.Service.AllowInvalidCerts = "y"
-	} else {
-		d.Service.AllowInvalidCerts = "n"
-	}
-	if d.Service.Interval == 0 {
-		d.Service.Interval = 600
-	}
-	if strings.ToLower(d.Service.ProgressiveVersioning) == "false" || strings.ToLower(d.Service.ProgressiveVersioning) == "no" {
-		d.Service.ProgressiveVersioning = "n"
-	} else {
-		d.Service.ProgressiveVersioning = "y"
-	}
-	if strings.ToLower(d.Service.IgnoreMiss) == "true" || strings.ToLower(d.Service.IgnoreMiss) == "yes" {
-		d.Service.IgnoreMiss = "y"
-	} else {
-		d.Service.IgnoreMiss = "n"
-	}
+	d.Service.AllowInvalidCerts = stringBool(d.Service.AllowInvalidCerts, "", "", false)
+	d.Service.IgnoreMiss = stringBool(d.Service.IgnoreMiss, "", "", false)
+	d.Service.Interval = valueOrValueUInt(d.Service.Interval, 600)
+	d.Service.ProgressiveVersioning = stringBool(d.Service.ProgressiveVersioning, "", "", true)
 
 	// Slack defaults.
-	if d.Slack.Delay == "" {
-		d.Slack.Delay = "0s"
-	}
+	d.Slack.Delay = valueOrValueString(d.Slack.Delay, "0s")
 	if d.Slack.IconEmoji == "" && d.Slack.IconURL == "" {
 		d.Slack.IconEmoji = ":github:"
 	}
-	if d.Slack.MaxTries == 0 {
-		d.Slack.MaxTries = 3
-	}
-	if d.Slack.Message == "" {
-		d.Slack.Message = "<${service_url}|${service_id}> - ${version} released"
-	}
-	if d.Slack.Username == "" {
-		d.Slack.Username = "Release Notifier"
-	}
+	d.Slack.MaxTries = valueOrValueUInt(d.Slack.MaxTries, 3)
+	d.Slack.Message = valueOrValueString(d.Slack.Message, "<${service_url}|${service_id}> - ${version} released")
+	d.Slack.Username = valueOrValueString(d.Slack.Username, "Release Notifier")
 
 	// WebHook defaults.
-	if d.WebHook.Delay == "" {
-		d.WebHook.Delay = "0s"
-	}
-	if d.WebHook.DesiredStatusCode == 0 {
-		d.WebHook.DesiredStatusCode = 0
-	}
-	if d.WebHook.MaxTries == 0 {
-		d.WebHook.MaxTries = 3
-	}
-	if strings.ToLower(d.WebHook.SilentFails) == "true" || strings.ToLower(d.WebHook.SilentFails) == "yes" {
-		d.WebHook.SilentFails = "y"
-	} else {
-		d.WebHook.SilentFails = "n"
-	}
+	d.WebHook.Delay = valueOrValueString(d.WebHook.Delay, "0s")
+	d.WebHook.DesiredStatusCode = valueOrValueInt(d.WebHook.DesiredStatusCode, 0)
+	d.WebHook.MaxTries = valueOrValueUInt(d.WebHook.MaxTries, 3)
+	d.WebHook.SilentFails = stringBool(d.WebHook.SilentFails, "", "", false)
+}
+
+// print will print the defaults
+func (d *Defaults) print() {
+	fmt.Println("defaults:")
+
+	// Service defaults.
+	fmt.Println("  service:")
+	fmt.Printf("    allow_invalid_certs: %s\n", d.Service.AllowInvalidCerts)
+	fmt.Printf("    ignore_miss: %s\n", d.Service.IgnoreMiss)
+	fmt.Printf("    interval: %d\n", d.Service.Interval)
+	fmt.Printf("    progressive_versioning: %s\n", d.Service.ProgressiveVersioning)
+
+	// Slack defaults.
+	fmt.Println("  slack:")
+	fmt.Printf("    delay: %s\n", d.Slack.Delay)
+	fmt.Printf("    icon_emoji: '%s'\n", d.Slack.IconEmoji)
+	fmt.Printf("    icon_url: '%s'\n", d.Slack.IconURL)
+	fmt.Printf("    max_tries: %d\n", d.Slack.MaxTries)
+	fmt.Printf("    message: '%s'\n", d.Slack.Message)
+	fmt.Printf("    username: '%s'\n", d.Slack.Username)
+
+	// WebHook defaults.
+	fmt.Println("  webhook:")
+	fmt.Printf("    delay: %s\n", d.WebHook.Delay)
+	fmt.Printf("    desired_status_code: %d\n", d.WebHook.DesiredStatusCode)
+	fmt.Printf("    max_tries: %d\n", d.WebHook.MaxTries)
+	fmt.Printf("    silent_fails: %s\n", d.WebHook.SilentFails)
 }
 
 // getConf reads file as Config.
@@ -103,7 +99,7 @@ func (c *Config) getConf(file string) *Config {
 	return c
 }
 
-// setDefaults sets the defaults for each undefined var.
+// setDefaults sets undefined variables to their default.
 func (c *Config) setDefaults() *Config {
 	c.Defaults.setDefaults()
 	for monitorIndex := range c.Monitor {
@@ -118,12 +114,11 @@ func (c *Config) setDefaults() *Config {
 	return c
 }
 
-// valueOrDefault will return value if it's not empty, dflt otherwise.
-func valueOrDefault(value string, dflt string) string {
-	if value == "" {
-		return dflt
-	}
-	return value
+// print will print the parsed config.
+func (c *Config) print() {
+	c.Monitor.print()
+	fmt.Println()
+	c.Defaults.print()
 }
 
 // SetLogLevel will set logLevel to value if that's in the acceptable range, 2 otherwise
@@ -136,16 +131,26 @@ func SetLogLevel(value int) {
 	}
 }
 
+// configPrint will act on the 'config-check' flag and print the parsed
+func configPrint(flag *bool, cfg *Config) {
+	if *flag {
+		cfg.print()
+		os.Exit(0)
+	}
+}
+
 // main loads the config and then calls Monitor.Track to monitor
 // each Service of the monitor targets for version changes and act
 // on them as defined.
 func main() {
 	var (
-		configFile = flag.String("config", "config.yml", "The path to the config file to use") // "path/to/config.yml"
-		config     Config
+		configFile      = flag.String("config", "config.yml", "The path to the config file to use") // "path/to/config.yml"
+		configPrintFlag = flag.Bool("config-check", false, "Use to print the fully-parsed config")
+		config          Config
 	)
 
 	flag.Parse()
+
 	if *logLevel > 4 || *logLevel < 0 {
 		log.Println("ERROR: loglevel should be between 0 and 4 (inclusive), setting yours to 2 (info)")
 		*logLevel = 2
@@ -154,8 +159,12 @@ func main() {
 	if *logLevel > 2 {
 		log.Printf("VERBOSE: Loading config from '%s'", *configFile)
 	}
+
 	config.getConf(*configFile)
 	config.setDefaults()
+
+	// configPrint
+	configPrint(configPrintFlag, &config)
 
 	serviceCount := 0
 	for mIndex, monitor := range config.Monitor {
@@ -168,18 +177,18 @@ func main() {
 	if serviceCount == 0 {
 		log.Printf("ERROR: Exiting as no services to monitor were found in '%s'", *configFile)
 		os.Exit(1)
-	} else {
-		if *logLevel > 1 {
-			log.Printf("INFO: %d targets with %d services to monitor:", len(config.Monitor), serviceCount)
+	}
 
-			for _, monitor := range config.Monitor {
-				if len(monitor.Service) == 1 {
-					log.Printf("  - %s", monitor.Service[0].ID)
-				} else {
-					log.Printf("  - %s:", monitor.ID)
-					for _, service := range monitor.Service {
-						log.Printf("      - %s", service.ID)
-					}
+	if *logLevel > 1 {
+		log.Printf("INFO: %d targets with %d services to monitor:", len(config.Monitor), serviceCount)
+
+		for _, monitor := range config.Monitor {
+			if len(monitor.Service) == 1 {
+				log.Printf("  - %s", monitor.Service[0].ID)
+			} else {
+				log.Printf("  - %s:", monitor.ID)
+				for _, service := range monitor.Service {
+					log.Printf("      - %s", service.ID)
 				}
 			}
 		}

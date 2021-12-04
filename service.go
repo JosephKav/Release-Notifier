@@ -24,15 +24,15 @@ type Service struct {
 	Type                  string          `yaml:"type"`                   // "github"/"URL"
 	URL                   string          `yaml:"url"`                    // type:URL - "https://example.com", type:github - "owner/repo" or "https://github.com/owner/repo".
 	URLCommands           URLCommandSlice `yaml:"url_commands"`           // Commands to filter the release from the URL request.
+	Interval              uint            `yaml:"interval"`               // 600 = Sleep 600 seconds between queries.
+	ProgressiveVersioning string          `yaml:"progressive_versioning"` // default - true  = Version has to be greater than the previous to trigger Slack(s)/WebHook(s).
 	RegexContent          string          `yaml:"regex_content"`          // "abc-[a-z]+-${version}_amd64.deb" This regex must exist in the body of the URL to trigger new version actions.
 	RegexVersion          string          `yaml:"regex_version"`          // "v*[0-9.]+" The version found must match this release to trigger new version actions.
-	ProgressiveVersioning string          `yaml:"progressive_versioning"` // default - true  = Version has to be greater than the previous to trigger Slack(s)/WebHook(s).
-	AllowInvalidCerts     string          `yaml:"allow_invalid"`          // default - false = Disallows invalid HTTPS certificates.
-	AccessToken           string          `yaml:"access_token"`           // GitHub access token to use.
-	Interval              uint            `yaml:"interval"`               // 600 = Sleep 600 seconds between queries.
 	SkipSlack             bool            `yaml:"skip_slack"`             // default - false = Don't skip Slack messages for new releases.
 	SkipWebHook           bool            `yaml:"skip_webhook"`           // default - false = Don't skip WebHooks for new releases.
 	IgnoreMiss            string          `yaml:"ignore_misses"`          // Ignore URLCommands that fail (e.g. split on text that doesn't exist)
+	AccessToken           string          `yaml:"access_token"`           // GitHub access token to use.
+	AllowInvalidCerts     string          `yaml:"allow_invalid"`          // default - false = Disallows invalid HTTPS certificates.
 	Slack                 Slack           `yaml:"slack"`                  // Override Slack message vars.
 	status                status          ``                              // Track the Status of this source (version and regex misses).
 }
@@ -86,6 +86,18 @@ func (c *URLCommandSlice) UnmarshalYAML(unmarshal func(interface{}) error) error
 	return nil
 }
 
+// print will print the URLCommand's in the URLCommandSlice
+func (u *URLCommandSlice) print(prefix string) {
+	noCmds := ""
+	if len(*u) == 0 {
+		noCmds = " []"
+	}
+	fmt.Printf("%surl_commands:%s\n", prefix, noCmds)
+	for _, command := range *u {
+		command.print(prefix)
+	}
+}
+
 // URLCommand is a command to be ran to filter version from the URL body.
 type URLCommand struct {
 	Type       string `yaml:"type"`          // "regex"/"regex_submatch"/"replace"/"split"
@@ -95,6 +107,27 @@ type URLCommand struct {
 	New        string `yaml:"new"`           // strings.ReplaceAll(tgtString, "Old", "New")
 	Text       string `yaml:"text"`          // strings.Split(tgtString, "Text")
 	IgnoreMiss string `yaml:"ignore_misses"` // Ignore this command failing (e.g. split on text that doesn't exist)
+}
+
+// print will print the URLCommand
+func (u *URLCommand) print(prefix string) {
+	fmt.Printf("%s  - type: %s\n", prefix, u.Type)
+	switch u.Type {
+	case "regex":
+		fmt.Printf("%s    regex: '%s'\n", prefix, u.Regex)
+		fmt.Printf("%s    ignore_misses: %s\n", prefix, u.IgnoreMiss)
+	case "regex_submatch":
+		fmt.Printf("%s    regex: '%s'\n", prefix, u.Regex)
+		fmt.Printf("%s    index: %d\n", prefix, u.Index)
+		fmt.Printf("%s    ignore_misses: %s\n", prefix, u.IgnoreMiss)
+	case "replace":
+		fmt.Printf("%s    new: '%s'\n", prefix, u.New)
+		fmt.Printf("%s    old: '%s'\n", prefix, u.Old)
+	case "split":
+		fmt.Printf("%s    text: '%s'\n", prefix, u.Text)
+		fmt.Printf("%s    index: %d\n", prefix, u.Index)
+		fmt.Printf("%s    ignore_misses: %s\n", prefix, u.IgnoreMiss)
+	}
 }
 
 // checkValues will check the variables for all of this services Slack recipients.
@@ -123,42 +156,30 @@ type status struct {
 	serviceMisses      string // "1000" 1 = miss, 0 = no miss for split etc.
 }
 
-// setDefaults sets the defaults for undefined Service values using defaults.
+// init initialises the status vars when more than the default value is needed.
 func (s *status) init() {
 	s.serviceMisses = "0000"
 }
 
-// setDefaults sets the defaults for undefined Service values using defaults.
+// setDefaults sets undefined variables to their default.
 func (s *ServiceSlice) setDefaults(defaults Defaults) {
 	for index := range *s {
 		(*s)[index].setDefaults(defaults)
 	}
 }
 
-// setDefaults sets the defaults for each undefined var using defaults.
+// setDefaults sets undefined variables to their default.
 func (s *Service) setDefaults(defaults Defaults) {
 	// Default GitHub Access Token.
-	if s.AccessToken == "" {
-		s.AccessToken = defaults.Service.AccessToken
-	}
+	s.AccessToken = valueOrValueString(s.AccessToken, defaults.Service.AccessToken)
 
 	// Default allowance/rejection of invalid certs.
-	if s.AllowInvalidCerts == "" {
-		s.AllowInvalidCerts = defaults.Service.AllowInvalidCerts
-	} else if strings.ToLower(s.AllowInvalidCerts) == "true" || strings.ToLower(s.AllowInvalidCerts) == "yes" {
-		s.AllowInvalidCerts = "y"
-	} else {
-		s.AllowInvalidCerts = "n"
-	}
+	s.AllowInvalidCerts = valueOrValueString(s.AllowInvalidCerts, defaults.Service.AllowInvalidCerts)
+	s.AllowInvalidCerts = stringBool(s.AllowInvalidCerts, "", "", false)
 
 	// Default progressive versioning (versions have to be successive to notify)
-	if s.ProgressiveVersioning == "" {
-		s.ProgressiveVersioning = defaults.Service.ProgressiveVersioning
-	} else if strings.ToLower(s.ProgressiveVersioning) == "false" || strings.ToLower(s.ProgressiveVersioning) == "no" {
-		s.ProgressiveVersioning = "n"
-	} else {
-		s.ProgressiveVersioning = "y"
-	}
+	s.ProgressiveVersioning = valueOrValueString(s.ProgressiveVersioning, defaults.Service.ProgressiveVersioning)
+	s.ProgressiveVersioning = stringBool(s.ProgressiveVersioning, "", "", true)
 
 	// Default ID if undefined/blank.
 	if s.ID == "" {
@@ -197,9 +218,7 @@ func (s *Service) setDefaults(defaults Defaults) {
 	}
 
 	// Default Interval.
-	if s.Interval == 0 {
-		s.Interval = defaults.Service.Interval
-	}
+	s.Interval = valueOrValueUInt(s.Interval, defaults.Service.Interval)
 
 	// Default Type.
 	if s.Type == "" {
@@ -226,34 +245,24 @@ func (s *Service) setDefaults(defaults Defaults) {
 		}
 	}
 
-	if s.IgnoreMiss == "" {
-		s.IgnoreMiss = defaults.Service.IgnoreMiss
-	} else if strings.ToLower(s.IgnoreMiss) == "true" || strings.ToLower(s.IgnoreMiss) == "yes" {
-		s.IgnoreMiss = "y"
-	} else {
-		s.IgnoreMiss = "n"
-	}
+	s.IgnoreMiss = valueOrValueString(s.IgnoreMiss, defaults.Service.IgnoreMiss)
+	s.IgnoreMiss = stringBool(s.IgnoreMiss, "", "", false)
 
 	s.URLCommands.setDefaults(defaults, s)
 }
 
-// setDefaults sets the defaults for undefined Service values using defaults.
+// setDefaults sets undefined variables to their default.
 func (c *URLCommandSlice) setDefaults(defaults Defaults, service *Service) {
 	for index := range *c {
 		(*c)[index].setDefaults(defaults, service)
 	}
 }
 
-// setDefaults sets the defaults for each undefined var using defaults.
+// setDefaults sets undefined variables to their default.
 func (c *URLCommand) setDefaults(defaults Defaults, service *Service) {
 	// Default IgnoreMiss.
-	if c.IgnoreMiss == "" {
-		c.IgnoreMiss = service.IgnoreMiss
-	} else if strings.ToLower(c.IgnoreMiss) == "true" || strings.ToLower(c.IgnoreMiss) == "yes" {
-		c.IgnoreMiss = "y"
-	} else {
-		c.IgnoreMiss = "n"
-	}
+	c.IgnoreMiss = valueOrValueString(c.IgnoreMiss, defaults.Service.IgnoreMiss)
+	c.IgnoreMiss = stringBool(c.IgnoreMiss, "", "", false)
 }
 
 // setVersion sets Service.Version to v.

@@ -15,7 +15,6 @@ import (
 	"net/http"
 	"os"
 	"strconv"
-	"strings"
 	"time"
 )
 
@@ -24,13 +23,13 @@ type WebHookSlice []WebHook
 
 // WebHook is a WebHook to send.
 type WebHook struct {
-	Type              string `yaml:"type"`                // "github"/"url"
-	URL               string `yaml:"url"`                 // "https://example.com"
-	Secret            string `yaml:"secret"`              // "SECRET"
-	DesiredStatusCode int    `yaml:"desired_status_code"` // e.g. 202
-	Delay             string `yaml:"delay"`               // The delay before sending the WebHook.
-	MaxTries          uint   `yaml:"maxtries"`            // Number of times to attempt sending the WebHook if the desired status code is not received.
-	SilentFails       string `yaml:"silent_fails"`        // Whether to notify if this WebHook fails MaxTries times.
+	Type              string `yaml:"type"`                          // "github"/"url"
+	URL               string `yaml:"url"`                           // "https://example.com"
+	Secret            string `yaml:"secret,omitempty"`              // "SECRET"
+	DesiredStatusCode int    `yaml:"desired_status_code,omitempty"` // e.g. 202
+	Delay             string `yaml:"delay,omitempty"`               // The delay before sending the WebHook.
+	MaxTries          uint   `yaml:"maxtries,omitempty"`            // Number of times to attempt sending the WebHook if the desired status code is not received.
+	SilentFails       string `yaml:"silent_fails,omitempty"`        // Whether to notify if this WebHook fails MaxTries times.
 }
 
 // UnmarshalYAML allows handling of a dict as well as a list of dicts.
@@ -56,34 +55,27 @@ func (w *WebHookSlice) UnmarshalYAML(unmarshal func(interface{}) error) error {
 	return nil
 }
 
-// setDefaults calls setDefaults on each WebHook to set the defaults for undefined values.
+// setDefaults sets undefined variables to their default.
 func (w *WebHookSlice) setDefaults(defaults Defaults) {
 	for index := range *w {
 		(*w)[index].setDefaults(defaults)
 	}
 }
 
-// setDefaults sets the defaults for each undefined var using defaults.
+// setDefaults sets undefined variables to their default.
 func (w *WebHook) setDefaults(defaults Defaults) {
-	if w.DesiredStatusCode == 0 {
-		w.DesiredStatusCode = defaults.WebHook.DesiredStatusCode
-	}
+	// DesiredStatusCode
+	w.DesiredStatusCode = valueOrValueInt(w.DesiredStatusCode, defaults.WebHook.DesiredStatusCode)
 
-	if w.Delay == "" {
-		w.Delay = valueOrDefault(w.Delay, defaults.WebHook.Delay)
-	}
+	// Delay
+	w.Delay = valueOrValueString(w.Delay, defaults.WebHook.Delay)
 
-	if w.MaxTries == 0 {
-		w.MaxTries = defaults.WebHook.MaxTries
-	}
+	// MaxTries
+	w.MaxTries = valueOrValueUInt(w.MaxTries, defaults.WebHook.MaxTries)
 
-	if w.SilentFails == "" {
-		w.SilentFails = defaults.WebHook.SilentFails
-	} else if strings.ToLower(w.SilentFails) == "true" || strings.ToLower(w.SilentFails) == "yes" {
-		w.SilentFails = "y"
-	} else {
-		w.SilentFails = "n"
-	}
+	// SilentFails
+	w.SilentFails = valueOrValueString(w.SilentFails, defaults.WebHook.SilentFails)
+	w.SilentFails = stringBool(w.SilentFails, "", "", false)
 }
 
 // checkValues will check the variables for all of this Monitor's WebHook recipients.
