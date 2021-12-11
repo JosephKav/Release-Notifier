@@ -1,4 +1,5 @@
 name: Test
+
 on:
   push:
     tags:
@@ -6,10 +7,12 @@ on:
     branches:
       - main
   pull_request:
+
 jobs:
   test:
     name: test
     runs-on: ubuntu-latest
+
     steps:
       - id: go-cache-paths
         run: |
