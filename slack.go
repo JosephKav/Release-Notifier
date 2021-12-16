@@ -5,7 +5,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
 	"net/http"
 	"strconv"
 	"strings"
@@ -102,7 +101,7 @@ func (s *Slack) checkValues(monitorID string, index int, loneService bool) {
 		}
 		if _, err := time.ParseDuration(s.Delay); err != nil {
 			msg := fmt.Sprintf("%s.delay (%s) is invalid (Use 'AhBmCs' duration format)", target, s.Delay)
-			logFatal(msg, true)
+			jLog.Fatal(msg, true)
 		}
 	}
 }
@@ -126,29 +125,25 @@ func (s *SlackSlice) send(monitorID string, svc *Service, message string) {
 			// Delay sending the Slack message by the defined interval.
 			sleepTime, _ := time.ParseDuration((*s)[index].Delay)
 			msg := fmt.Sprintf("%s, Sleeping for %s before sending the Slack message", monitorID, (*s)[index].Delay)
-			logInfo(*logLevel, msg, sleepTime != 0)
+			jLog.Info(msg, sleepTime != 0)
 			time.Sleep(sleepTime)
 
 			for {
 				err := (*s)[index].send(monitorID, svc, message)
 
-				// SUCCESS
+				// SUCCESS!
 				if err == nil {
 					return
 				}
-				msg := fmt.Sprintf("ERROR: %s (%s), Sending Slack failed.\n%v", svc.ID, monitorID, err)
-				logError(msg, true)
 
 				// FAIL
+				jLog.Error(err.Error(), true)
 				triesLeft--
 
 				// Give up after MaxTries.
 				if triesLeft == 0 {
-					// If not verbose or above (above, this would already have been printed).
-					msg := fmt.Sprintf("%s", err)
-					logError(msg, (*logLevel < 3))
-					msg = fmt.Sprintf("%s (%s), Failed %d times to send a slack message to %s", svc.ID, monitorID, (*s)[index].MaxTries, (*s)[index].URL)
-					logError(msg, true)
+					msg = fmt.Sprintf("%s (%s), Failed %d times to send a Slack message to %s", svc.ID, monitorID, (*s)[index].MaxTries, (*s)[index].URL)
+					jLog.Error(msg, true)
 					return
 				}
 
@@ -210,23 +205,18 @@ func (s *Slack) send(monitorID string, svc *Service, message string) error {
 	if err != nil {
 		// If verbose or above, print the error every time
 		msg := fmt.Sprintf("%s (%s), Slack\n%s", svc.ID, monitorID, err)
-		logVerbose(*logLevel, msg, true)
+		jLog.Verbose(msg, true)
 		return err
 	}
 	defer resp.Body.Close()
 
 	// SUCCESS (2XX)
 	if strconv.Itoa(resp.StatusCode)[:1] == "2" {
-
 		msg := fmt.Sprintf("%s (%s), Slack message sent", svc.ID, monitorID)
-		logInfo(*logLevel, msg, true)
+		jLog.Info(msg, true)
 		return nil
 	}
 
 	// FAIL
-	body, _ := ioutil.ReadAll(resp.Body)
-	// If verbose or above, print the error every time
-	msg := fmt.Sprintf("%s (%s), Slack request didn't 2XX\n%s\n%s", svc.ID, monitorID, resp.Status, body)
-	logVerbose(*logLevel, msg, true)
-	return fmt.Errorf("%s. %s", resp.Status, body)
+	return fmt.Errorf("%s (%s), Slack message failed to send.\n%s", svc.ID, monitorID, err)
 }

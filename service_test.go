@@ -14,7 +14,6 @@ func TestServiceQuery(t *testing.T) {
 	config.getConf(configFile)
 	config.setDefaults()
 
-	SetLogLevel(0)
 	config.Monitor[2].Service[0].AccessToken = ""
 	_ = config.Monitor[2].Service[0].query(0, config.Monitor[2].ID)
 	got := config.Monitor[2].Service[0].status.version

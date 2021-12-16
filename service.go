@@ -146,7 +146,7 @@ func (c *URLCommand) run(monitorID string, service *Service, text string) (strin
 	// Iterate through the commands to filter the text.
 	textBak := text
 	msg := fmt.Sprintf("Looking through %s", text)
-	logDebug(*logLevel, msg, true)
+	jLog.Debug(msg, true)
 
 	var err error = nil
 
@@ -163,7 +163,7 @@ func (c *URLCommand) run(monitorID string, service *Service, text string) (strin
 	}
 
 	msg = fmt.Sprintf("%s (%s), Resolved to %s", service.ID, monitorID, text)
-	logDebug(*logLevel, msg, true)
+	jLog.Debug(msg, true)
 	return text, nil
 }
 
@@ -177,7 +177,7 @@ func (c *URLCommand) regex(monitorID string, service Service, text string) (stri
 	case "regex_submatch":
 		if c.Index < 0 {
 			msg := fmt.Sprintf("%s (%s), %s (%s) shouldn't use negative indices as the array is always made up from the first match.", service.ID, monitorID, c.Type, c.Regex)
-			logWarn(*logLevel, msg, true)
+			jLog.Warn(msg, true)
 		}
 		texts = re.FindStringSubmatch(text)
 	}
@@ -185,7 +185,7 @@ func (c *URLCommand) regex(monitorID string, service Service, text string) (stri
 	if len(texts) == 0 {
 		msg := fmt.Sprintf("%s (%s), %s (%s) didn't return any matches", service.ID, monitorID, c.Type, c.Regex)
 		if getAtIndex(service.status.serviceMisses, 2) == "0" {
-			logWarn(*logLevel, msg, true)
+			jLog.Warn(msg, true)
 			service.status.serviceMisses = replaceAtIndex(service.status.serviceMisses, '1', 2)
 		}
 		// Stop if miss.
@@ -205,7 +205,7 @@ func (c *URLCommand) regex(monitorID string, service Service, text string) (stri
 	if (len(texts) - index) < 1 {
 		msg := fmt.Sprintf("%s (%s), %s (%s) returned %d elements but the index wants element number %d", service.ID, monitorID, c.Type, c.Regex, len(texts), (index + 1))
 		if getAtIndex(service.status.serviceMisses, 3) == "0" {
-			logWarn(*logLevel, msg, true)
+			jLog.Warn(msg, true)
 			service.status.serviceMisses = replaceAtIndex(service.status.serviceMisses, '1', 3)
 		}
 		// Stop if miss.
@@ -225,7 +225,7 @@ func (c *URLCommand) split(monitorID string, service Service, text string) (stri
 	if len(texts) == 1 {
 		msg := fmt.Sprintf("%s (%s), %s didn't find any '%s' to split on", service.ID, monitorID, c.Type, c.Text)
 		if getAtIndex(service.status.serviceMisses, 0) == "0" {
-			logWarn(*logLevel, msg, true)
+			jLog.Warn(msg, true)
 			service.status.serviceMisses = replaceAtIndex(service.status.serviceMisses, '1', 0)
 		}
 		// Stop if miss.
@@ -245,7 +245,7 @@ func (c *URLCommand) split(monitorID string, service Service, text string) (stri
 	if (len(texts) - index) < 1 {
 		msg := fmt.Sprintf("%s (%s), %s (%s) returned %d elements but the index wants element number %d", service.ID, monitorID, c.Type, c.Text, len(texts), (index + 1))
 		if getAtIndex(service.status.serviceMisses, 1) == "0" {
-			logWarn(*logLevel, msg, true)
+			jLog.Warn(msg, true)
 			service.status.serviceMisses = replaceAtIndex(service.status.serviceMisses, '1', 1)
 		}
 		// Stop if miss.
@@ -272,7 +272,7 @@ func (c *URLCommand) checkValues(monitorID string, serviceID string) {
 	case "split", "replace", "regex", "regex_submatch":
 	default:
 		msg := fmt.Sprintf("%s (%s), %s is an unknown type for url_commands", serviceID, monitorID, c.Type)
-		logFatal(msg, true)
+		jLog.Fatal(msg, true)
 	}
 }
 
@@ -300,7 +300,7 @@ func (s *Service) checkValues(monitorID string, index int, loneService bool) {
 		}
 		if _, err := time.ParseDuration(s.Interval); err != nil {
 			msg := fmt.Sprintf("%s.interval (%s) is invalid (Use 'AhBmCs' duration format)", target, s.Interval)
-			logFatal(msg, true)
+			jLog.Fatal(msg, true)
 		}
 	}
 
@@ -308,7 +308,7 @@ func (s *Service) checkValues(monitorID string, index int, loneService bool) {
 	if s.Slack.Delay != "" {
 		if _, err := time.ParseDuration(s.Slack.Delay); err != nil {
 			msg := fmt.Sprintf("%s.slack.delay (%s) is invalid (Use 'AhBmCs' duration format)", target, s.Slack.Delay)
-			logFatal(msg, true)
+			jLog.Fatal(msg, true)
 		}
 	}
 }
@@ -478,7 +478,7 @@ func (s *Service) query(index int, monitorID string) bool {
 	req, err := http.NewRequest(http.MethodGet, s.URL, nil)
 	if err != nil {
 		msg := fmt.Sprintf("%s, %s", s.ID, err)
-		logError(msg, true)
+		jLog.Error(msg, true)
 		return false
 	}
 
@@ -493,11 +493,11 @@ func (s *Service) query(index int, monitorID string) bool {
 		// Don't crash on invalid certs.
 		if strings.Contains(err.Error(), "x509") {
 			msg := fmt.Sprintf("x509 for %s (%s) (Cert invalid)", s.ID, monitorID)
-			logWarn(*logLevel, msg, true)
+			jLog.Warn(msg, true)
 			return false
 		}
 		msg := fmt.Sprintf("%s (%s), %s", s.ID, monitorID, err)
-		logError(msg, true)
+		jLog.Error(msg, true)
 		return false
 	}
 
@@ -505,7 +505,7 @@ func (s *Service) query(index int, monitorID string) bool {
 	rawBody, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
 		msg := fmt.Sprintf("%s (%s), %s", s.ID, monitorID, err)
-		logError(msg, true)
+		jLog.Error(msg, true)
 		return false
 	}
 	// Convert the body to string.
@@ -518,15 +518,15 @@ func (s *Service) query(index int, monitorID string) bool {
 		if len(body) < 500 {
 			if !strings.Contains(body, `"tag_name"`) {
 				msg := "GitHub Access Token is invalid!"
-				logFatal(msg, strings.Contains(body, "Bad credentials"))
+				jLog.Fatal(msg, strings.Contains(body, "Bad credentials"))
 
 				msg = fmt.Sprintf("tag_name not found for %s (%s) at %s\n%s", s.ID, monitorID, s.URL, body)
-				logError(msg, true)
+				jLog.Error(msg, true)
 				return false
 			}
 			if strings.Contains(body, "rate limit") {
 				msg := fmt.Sprintf("Rate limit reached on %s (%s)", s.ID, monitorID)
-				logWarn(*logLevel, msg, true)
+				jLog.Warn(msg, true)
 				return false
 			}
 		}
@@ -551,13 +551,13 @@ func (s *Service) query(index int, monitorID string) bool {
 			oldVersion, err := semver.NewVersion(s.status.version)
 			if err != nil {
 				msg := fmt.Sprintf("%s (%s), failed converting '%s' to a semantic version", s.ID, monitorID, s.status.version)
-				logError(msg, true)
+				jLog.Error(msg, true)
 				failedSemanticVersioning = true
 			}
 			newVersion, err := semver.NewVersion(version)
 			if err != nil {
 				msg := fmt.Sprintf("%s (%s), failed converting '%s' to a semantic version", s.ID, monitorID, version)
-				logError(msg, true)
+				jLog.Error(msg, true)
 				failedSemanticVersioning = true
 			}
 
@@ -576,7 +576,7 @@ func (s *Service) query(index int, monitorID string) bool {
 			if !regexMatch {
 				msg := fmt.Sprintf("%s (%s), Regex not matched on content for version %s", s.ID, monitorID, version)
 				s.status.regexMissesContent++
-				logVerbose(*logLevel, msg, s.status.regexMissesContent == 1)
+				jLog.Verbose(msg, s.status.regexMissesContent == 1)
 				return false
 			}
 		}
@@ -586,7 +586,7 @@ func (s *Service) query(index int, monitorID string) bool {
 			if !regexMatch {
 				msg := fmt.Sprintf("%s (%s), Regex not matched on version %s", s.ID, monitorID, version)
 				s.status.regexMissesVersion++
-				logVerbose(*logLevel, msg, s.status.regexMissesVersion == 1)
+				jLog.Verbose(msg, s.status.regexMissesVersion == 1)
 				return false
 			}
 		}
@@ -600,13 +600,13 @@ func (s *Service) query(index int, monitorID string) bool {
 			if s.ProgressiveVersioning == "y" {
 				if _, err := semver.NewVersion(version); err != nil {
 					msg := fmt.Sprintf("%s (%s), failed converting '%s' to a semantic version. If all versions are in this style, consider adding url_commands to get the version into the style of '1.2.3a' (https://semver.org/), or disabling progressive versioning (globally with defaults.service.progressive_versioning or just for this service with the progressive_versioning var)", s.ID, monitorID, version)
-					logFatal(msg, true)
+					jLog.Fatal(msg, true)
 				}
 			}
 
 			s.setVersion(version)
 			msg := fmt.Sprintf("%s (%s), Starting Release - %s", s.ID, monitorID, version)
-			logInfo(*logLevel, msg, true)
+			jLog.Info(msg, true)
 			// Don't notify on first version.
 			return false
 		}
@@ -614,7 +614,7 @@ func (s *Service) query(index int, monitorID string) bool {
 		// New version found.
 		s.setVersion(version)
 		msg := fmt.Sprintf("%s (%s), New Release - %s", s.ID, monitorID, version)
-		logInfo(*logLevel, msg, true)
+		jLog.Info(msg, true)
 		return true
 	}
 

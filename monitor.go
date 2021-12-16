@@ -82,7 +82,7 @@ func (m *MonitorSlice) track() {
 	for monitorIndex := range *m {
 		for serviceIndex := range (*m)[monitorIndex].Service {
 			msg := fmt.Sprintf("Tracking %s at %s every %s", (*m)[monitorIndex].Service[serviceIndex].ID, (*m)[monitorIndex].Service[serviceIndex].URL, (*m)[monitorIndex].Service[serviceIndex].Interval)
-			logVerbose(*logLevel, msg, true)
+			jLog.Verbose(msg, true)
 
 			// Track this Service in a infinite loop goroutine.
 			go (*m)[monitorIndex].track(serviceIndex)

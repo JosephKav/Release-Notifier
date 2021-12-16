@@ -99,7 +99,7 @@ func (w *WebHook) checkValues(monitorID string, index int, loneService bool) {
 		}
 		if _, err := time.ParseDuration(w.Delay); err != nil {
 			msg := fmt.Sprintf("%s.delay (%s) is invalid (Use 'AhBmCs' duration format)", target, w.Delay)
-			logFatal(msg, true)
+			jLog.Fatal(msg, true)
 		}
 	}
 }
@@ -144,7 +144,7 @@ func (w *WebHookSlice) send(monitorID string, serviceID string, slacks SlackSlic
 			// Delay sending the Slack message by the defined interval.
 			sleepTime, _ := time.ParseDuration((*w)[index].Delay)
 			msg := fmt.Sprintf("%s (%s), Sleeping for %s before sending the WebHook", serviceID, monitorID, (*w)[index].Delay)
-			logInfo(*logLevel, msg, (sleepTime != 0))
+			jLog.Info(msg, (sleepTime != 0))
 			time.Sleep(sleepTime)
 
 			for {
@@ -156,21 +156,20 @@ func (w *WebHookSlice) send(monitorID string, serviceID string, slacks SlackSlic
 				}
 
 				// FAIL!
+				jLog.Error(err.Error(), true)
 				triesLeft--
+
 				// Give up after MaxTries.
 				if triesLeft == 0 {
-					// If not verbose or above (above, this would already have been printed).
-					msg := fmt.Sprintf("%s (%s), %s", serviceID, monitorID, err)
-					logError(msg, (*logLevel < 3))
-					message := fmt.Sprintf("%s, Failed %d times to send a WebHook to %s", monitorID, (*w)[index].MaxTries, (*w)[index].URL)
+					msg := fmt.Sprintf("%s (%s), Failed %d times to send a WebHook to %s", serviceID, monitorID, (*w)[index].MaxTries, (*w)[index].URL)
 					if (*w)[index].SilentFails == "n" {
 						svc := Service{
 							ID: serviceID,
 						}
-						slacks.send(monitorID, &svc, message)
+						slacks.send(monitorID, &svc, msg)
 					}
-					msg = fmt.Sprintf("%s (%s), %s", serviceID, monitorID, message)
-					logError(msg, true)
+					msg = fmt.Sprintf("%s (%s), %s", serviceID, monitorID, msg)
+					jLog.Error(msg, true)
 					break
 				}
 				// Space out retries.
@@ -221,7 +220,7 @@ func (w *WebHook) send(monitorID string, serviceID string) error {
 	if err != nil {
 		// If verbose or above, print the error every time
 		msg := fmt.Sprintf("%s (%s), WebHook:\n%s", serviceID, monitorID, err)
-		logError(msg, (*logLevel > 2))
+		jLog.Error(msg, (jLog.Level > 2))
 		return err
 	}
 	defer resp.Body.Close()
@@ -229,7 +228,7 @@ func (w *WebHook) send(monitorID string, serviceID string) error {
 	// SUCCESS
 	if resp.StatusCode == w.DesiredStatusCode || (w.DesiredStatusCode == 0 && (strconv.Itoa(resp.StatusCode)[:1] == "2")) {
 		msg := fmt.Sprintf("%s (%s), (%d) WebHook received", serviceID, monitorID, resp.StatusCode)
-		logInfo(*logLevel, msg, true)
+		jLog.Info(msg, true)
 		return nil
 	}
 
@@ -242,8 +241,5 @@ func (w *WebHook) send(monitorID string, serviceID string) error {
 		desiredStatusCode = "2XX"
 	}
 
-	// If verbose or above, print the error every time
-	msg := fmt.Sprintf("%s (%s), WebHook didn't %s:\n%s\n%s", serviceID, monitorID, desiredStatusCode, resp.Status, body)
-	logError(msg, (*logLevel > 2))
-	return fmt.Errorf("%s, %s", resp.Status, body)
+	return fmt.Errorf("%s (%s), WebHook didn't %s:\n%s\n%s", serviceID, monitorID, desiredStatusCode, resp.Status, body)
 }

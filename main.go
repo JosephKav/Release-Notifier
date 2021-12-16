@@ -16,8 +16,7 @@ import (
 )
 
 var (
-	logLevel   = flag.Int("loglevel", 2, "0 = error, 1 = warn,\n2 = info,  3 = verbose,\n4 = debug")
-	timestamps = flag.Bool("timestamps", false, "Use to enable timestamps in cli output")
+	jLog JLog
 )
 
 // Config is the config for Release-Notifier.
@@ -92,11 +91,11 @@ func (d *Defaults) print() {
 func (c *Config) getConf(file string) *Config {
 	data, err := ioutil.ReadFile(file)
 	msg := fmt.Sprintf("ERROR: data.Get err\n%s ", err)
-	logError(msg, err != nil)
+	jLog.Error(msg, err != nil)
 
 	err = yaml.Unmarshal(data, c)
 	msg = fmt.Sprintf("ERROR: Unmarshal\n%s", err)
-	logFatal(msg, err != nil)
+	jLog.Fatal(msg, err != nil)
 	return c
 }
 
@@ -119,16 +118,6 @@ func (c *Config) print() {
 	c.Defaults.print()
 }
 
-// SetLogLevel will set logLevel to value if that's in the acceptable range, 2 otherwise
-func SetLogLevel(value int) {
-	if value > 4 || value < 0 {
-		logError("loglevel should be between 0 and 4 (inclusive), setting yours to 2 (info)", true)
-		*logLevel = 2
-	} else {
-		*logLevel = value
-	}
-}
-
 // configPrint will act on the 'config-check' flag and print the parsed
 func configPrint(flag *bool, cfg *Config) {
 	if *flag {
@@ -145,13 +134,16 @@ func main() {
 		config          Config
 		configFile      = flag.String("config", "config.yml", "The path to the config file to use") // "path/to/config.yml"
 		configPrintFlag = flag.Bool("config-check", false, "Use to print the fully-parsed config")
+		logLevel        = flag.Int("loglevel", 2, "0 = error, 1 = warn,\n2 = info,  3 = verbose,\n4 = debug")
+		timestamps      = flag.Bool("timestamps", false, "Use to enable timestamps in cli output")
 	)
 
 	flag.Parse()
 
-	SetLogLevel(*logLevel)
+	jLog.SetTimestamps(*timestamps)
+	jLog.SetLevel(*logLevel)
 	msg := fmt.Sprintf("Loading config from '%s'", *configFile)
-	logVerbose(*logLevel, msg, true)
+	jLog.Verbose(msg, true)
 
 	config.getConf(*configFile)
 	config.setDefaults()
@@ -169,13 +161,14 @@ func main() {
 
 	if serviceCount == 0 {
 		msg := fmt.Sprintf("Exiting as no services to monitor were found in '%s'", *configFile)
-		logError(msg, true)
+		jLog.Error(msg, true)
 		os.Exit(1)
 	}
 
-	if *logLevel > 1 {
+	// INFO or above
+	if jLog.Level > 1 {
 		msg := fmt.Sprintf("%d targets with %d services to monitor:", len(config.Monitor), serviceCount)
-		logInfo(*logLevel, msg, true)
+		jLog.Info(msg, true)
 
 		for _, monitor := range config.Monitor {
 			if len(monitor.Service) == 1 {
