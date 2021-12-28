@@ -4,7 +4,7 @@ import (
 	"strings"
 )
 
-// stringBool hand;es 'a' as a boolean in string form and returns valueIfA or valueIfNotA.
+// stringBool handles 'a' as a boolean in string form and returns valueIfA or valueIfNotA.
 //
 // trueIfBlank is for handling whether 'a' being blank returns true (valueIfA), or false (valueIfNotA)
 func stringBool(a string, valueIfA string, valueIfNotA string, trueIfBlank bool) string {

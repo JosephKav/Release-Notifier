@@ -122,7 +122,7 @@ type GotifyPayload struct {
 	Title    string                 `form:"title" query:"title" json:"title"`
 }
 
-// HandleExtras will parse the messaging extras from 'extras' and 'defaults' into tje GotifyPayload.
+// HandleExtras will parse the messaging extras from 'extras' and 'defaults' into the GotifyPayload.
 func (p *GotifyPayload) HandleExtras(extras GotifyExtras, defaults GotifyExtras, serviceURL string) {
 	// When received on Android and Gotify app is in focus
 	androidAction := valueOrValueString(extras.AndroidAction, defaults.AndroidAction)
