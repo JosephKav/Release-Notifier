@@ -6,11 +6,11 @@ defaults:
     message: '<${service_url}|${service_id}> - ${version} released'
     username: 'Release Notifier'
     icon_emoji: ':github_background:'
-    maxtries: 3
+    max_tries: 3
     delay: 1
   webhook:
     desired_status_code: 0
-    maxtries: 3
+    max_tries: 3
     delay: 2
     silent_fails: false
 
@@ -31,7 +31,7 @@ monitor:
       url: https://awx.example.com/api/v2/job_templates/XX/github/
       secret: YYYY
       desired_status_code: 202
-      maxtries: 1
+      max_tries: 1
       delay: 3s
       silent_fails: false
     slack:
@@ -39,7 +39,7 @@ monitor:
       message: overriddenMessage
       username: overriddenUsername
       icon_emoji: overriddenIconEmoji
-      maxtries: 10
+      max_tries: 10
       delay: 4s
   - id: WantDefaults
     service:

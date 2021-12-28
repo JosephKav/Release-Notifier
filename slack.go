@@ -20,9 +20,9 @@ type Slack struct {
 	IconEmoji string `yaml:"icon_emoji,omitempty"` // ":github:"
 	IconURL   string `yaml:"icon_url,omitempty"`   // "https://github.githubassets.com/images/modules/logos_page/GitHub-Mark.png"
 	Username  string `yaml:"username,omitempty"`   // "Release Notifier"
-	Message   string `yaml:"message,omitempty"`    // "${service} - ${version} released"
+	Message   string `yaml:"message,omitempty"`    // "<${service_url}|${service_id}> - ${version} released"
 	Delay     string `yaml:"delay,omitempty"`      // The delay before sending the Slack message.
-	MaxTries  uint   `yaml:"maxtries,omitempty"`   // Number of times to attempt sending the Slack message if a 200 is not received.
+	MaxTries  uint   `yaml:"max_tries,omitempty"`  // Number of times to attempt sending the Slack message if a 200 is not received.
 }
 
 // UnmarshalYAML allows handling of a dict as well as a list of dicts.

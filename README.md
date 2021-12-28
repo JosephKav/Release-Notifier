@@ -15,11 +15,13 @@ For example, you could set it to monitor the Gitea repo ([go-gitea/gitea](https:
       - [Defaults](#defaults)
         * [Example](#example-1)
         * [Service](#defaults---service)
+        * [Gotify](#defaults---gotify)
         * [Slack](#defaults---slack)
         * [WebHook](#defaults---webhook)
       - [Monitor](#monitor)
         * [Example](#example-2)
         * [Service](#monitor---service)
+        * [Gotify](#monitor---gotify)
         * [Slack](#monitor---slack)
         * [WebHook](#monitor---webhook)
 
@@ -86,16 +88,26 @@ defaults:
     progressive_versioning: true
     allow_invalid: false
     ignore_misses: false
+  gotify:
+    priority: 5
+    title: 'Release notifier'
+    message: '${service_id} - ${version} released'
+    delay: 0s
+    max_tries: 3
+    extras:
+      android_action: '${service_url}'
+      client_display: 'text/plain'
+      client_notification: '${service_url}'
   slack:
     message: '<${service_url}|${service_id}> - ${version} released'
     username: 'Release Notifier'
     icon_url: 'https://github.githubassets.com/images/modules/logos_page/GitHub-Mark.png'
     delay: 0s
-    maxtries: 3
+    max_tries: 3
   webhook:
     desired_status_code: 0
     delay: 1h2m3s
-    maxtries: 3
+    max_tries: 3
     silent_fails: false
 monitor:
   - id: CV-Site
@@ -117,14 +129,18 @@ monitor:
       type: github
       url: https://AWX_HOSTNAME/api/v2/job_templates/35/github/
       secret: SECRET_KEY
+    gotify:
+      url: https://GOTIFY_URL
+      token: APP_TOKEN
+      delay: 5s
     slack:
       url: https://SLACK_INCOMING_WEBHOOK
       delay: 5s
 ```
-Above, I set defaults.service.interval to 10m and then don't define an interval for the golang/go service. Therefore, the monitor for this service will follow defaults.service.interval and query the site every 10m. But, I can override that interval by stating it, for example in the adnanh/webhook service, I have set interval to 300s and so that page will be queried every 300 seconds. The defaults.webhook.delay of 1h5m4s will delay sending the webhook by 1 hour, 2 minutes and 3 seconds when a version change is noticed. The CV-Site slack messages will be delayed by 5 seconds since the slack.delay overrides defaults.slack.delay.
+Above, I set defaults.service.interval to 10m and then don't define an interval for the golang/go service. Therefore, the monitor for this service will follow defaults.service.interval and query the site every 10m. But, I can override that interval by stating it, for example in the adnanh/webhook service, I have set interval to 300s and so that page will be queried every 300 seconds. The defaults.webhook.delay of 1h5m4s will delay sending the webhook by 1 hour, 2 minutes and 3 seconds when a version change is noticed. The CV-Site Slack and Gotify messages will be delayed by 5 seconds since the slack.delay overrides defaults.slack.delay. The defaults.gotify.extras will cause the notifications to open the monitor.service.url when clicked and if the Gotify app is in focus when the notification is received.
 
 #### Defaults
-Defaults are not needed in the config, but you can override the coded defaults with your own defaults for service, webhook and slack in this defaults section. You could for example have a tiny defaults section that only has `defaults -> slack -> username: 'USERNAME'`, you do not need to define all values for a section. In the examples below, the values set are the coded defaults that will be used if they haven't been included in the service being monitored or the config defaults. (excluding access_token)
+Defaults are not required in the config, but you can override the coded defaults with your own defaults for service, gotify, slack and webhook in this defaults section. You could for example have a tiny defaults section that only has `defaults -> slack -> username: 'USERNAME'`, you do not need to define all values for a section. In the examples below, the values set are the coded defaults that will be used if they haven't been included in the service being monitored or the config defaults. (excluding access_token)
 
 ##### Example
 ```yaml
@@ -135,17 +151,27 @@ defaults:
     progressive_versioning: true
     allow_invalid: false
     ignore_misses: false
+  gotify:
+    delay: 0s
+    max_tries: 3
+    message: '${service_id} - ${version} released'
+    priority: 5
+    title: 'Release notifier'
+    extras:
+      android_action: ''
+      client_display: 'text/plain'
+      client_notification: ''
   slack:
     message: '<${service_url}|${service_id}> - ${version} released'
     username: 'Release Notifier'
     icon_emoji: ':github:'
     icon_url: ''
     delay: 0s
-    maxtries: 3
+    max_tries: 3
   webhook:
     desired_status_code: 0
     delay: 0s
-    maxtries: 3
+    max_tries: 3
     silent_fails: false
 ```
 
@@ -160,6 +186,31 @@ defaults:
     ignore_misses: false                # Ignore url_command fails (e.g. split on text that doesn't exist)
 ```
 
+##### Defaults - Gotify
+```yaml
+defaults:
+  gotify:
+    delay: 0s                                      # The delay before sending messages.
+    max_tries: 3                                   # Number of times to resend until a 2XX status code is received.
+    message: '${service_id} - ${version} released' # Formatting of the message to send.
+    priority: 5                                    # Priority of the message.
+    title: 'Release notifier'                      # Title of the message.
+    extras:
+      android_action: ''                           # URL to open when a notification is received whilst GOtify is in focus.
+      client_display: 'text/plain'                 # Whether the message should be rendered in markdown or plain text.
+      client_notification: ''                      # URL to open when the notification is clicked (Android).
+```
+message - Each element of the service array of a monitor element will trigger a Gotify message to the gotify's of the parent monitor unless service.skip_gotify is True. This is the message that is sent when a change in version is noticed.
+- `${service_id}`  will be replaced with the ID.
+- `${service_url}` will be replaced with the URL
+- `${version}`     will be replaced with the version that was found (e.g. `${version} = 10.6.3`).
+- `${monitor_id}`  will be replaced with the ID given to the parent (monitor element).
+
+extras:
+- `${service_url}` will be replaced with the URL
+
+(of the service element that is triggering the message)
+
 ##### Defaults - Slack
 ```yaml
 defaults:
@@ -169,7 +220,7 @@ defaults:
     icon_emoji: ':github:'                                          # The emoji icon for that user.
     icon_url: ''                                                    # The URL of an icon for that user.
     delay: 0s                                                       # The delay before sending messages.
-    maxtries: 3                                                     # Number of times to resend until a 2XX status code is received.
+    max_tries: 3                                                     # Number of times to resend until a 2XX status code is received.
 ```
 message - Each element of the service array of a monitor element will trigger a Slack message to the slack's of the parent monitor unless service.skip_slack is True. This is the message that is sent when a change in version is noticed.
 - `${service_id}`  will be replaced with the ID.
@@ -183,10 +234,10 @@ message - Each element of the service array of a monitor element will trigger a 
 ```yaml
 defaults:
   webhook:
-    desired_status_code: 0 # Status code indicating a success. Send maxtries # of times until we receive this. 0 = accept any 2XX code.
+    desired_status_code: 0 # Status code indicating a success. Send max_tries # of times until we receive this. 0 = accept any 2XX code.
     delay: 0s              # The delay before sending webhooks.
-    maxtries: 3            # Number of times to resend until desired_status_code is received.
-    silent_fails: false    # Whether to notify Slack if a webhook fails maxtries times
+    max_tries: 3            # Number of times to resend until desired_status_code is received.
+    silent_fails: false    # Whether to notify Slack if a webhook fails max_tries times
 ```
 
 #### Monitor
@@ -226,13 +277,16 @@ monitor:
     service:
       type: github
       url: go-gitea/gitea
+    gotify:
+      url: https://GOTIFY_URL
+      token: APP_TOKEN
     webhook:
       type: github
       url: https://AWX_HOSTNAME/api/v2/job_templates/36/github/
       secret: SECRET
       delay: 5h5m5m
 ```
-This program can monitor multiple services. Just provide them in the standard yaml list format like above. It can also monitor multiple sites under the same monitor element (if the same style Slack message(s) and webhook(s) are wanted), and can send multiple slack messages and/or github style webhooks when a new release is found. Just turn the monitor, webhook and slack sections into yaml lists. Note, if you don't have multiple slack messages, multiple webhooks or multiple sites/repos under the same service, you don't have to format it as a list. This can be seen in the Gitea example above (they don't all need to be lists. e.g. you could have a list of monitors with a single webhook that isn't formatted as a list).
+This program can monitor multiple services. Just provide them in the standard yaml list format like above. It can also monitor multiple sites under the same monitor element (if the same style Slack/Gotify message(s) and webhook(s) are wanted), and can send multiple Slack/Gotify messages, and/or github style webhooks when a new release is found. Just turn those sections into yaml lists. Note, if you don't have multiple slack messages, multiple webhooks or multiple sites/repos under the same service, you don't have to format it as a list. This can be seen in the Gitea example above (they don't all need to be lists. e.g. you could have a list of monitors with a single webhook that isn't formatted as a list).
 
 ##### Monitor - Service
 ```yaml
@@ -255,6 +309,7 @@ monitor:
       progressive_versioning: true                     # Optional. # Only send Slack(s) and/or WebHook(s) when the version increases (semantic versioning - e.g. v1.2.3a).
       allow_invalid: false                             # Optional. Allow invalid HTTPS Certificates.
       access_token: 'GITHUB_ACCESS_TOKEN'              # Optional. GitHub access token to use. Allows smaller interval (higher API rate limit).
+      skip_gotify: false                               # Optional. Don't send Gotify messages for new releases of this service.
       skip_slack: false                                # Optional. Don't send Slack messages for new releases of this service.
       skip_webhook: false                              # Optional. Don't send WebHooks for new releases of this service.
       interval: 10m                                    # Optional. The duration (AhBmCs where h is hours, m is minutes and s is seconds) to sleep between querying the URL for the version.
@@ -280,6 +335,38 @@ url_commands:
   - replace:
     - This will replace `old` with `new` in the URL content at this point.
 
+##### Monitor - Gotify
+```yaml
+monitor:
+  - id: "PRETTY_SERVICE_NAME" # Optional. Replaces ${monitor_id} in Slack messages.
+    service:                  # Required.
+      ....
+    gotify:                    # Optional.
+      url: https://GOTIFY_URL                        # Required. The URL of the Gotify server.
+      token: APP_TOKEN                               # Required. The app token to use.
+      delay: 0s                                      # Optional. The delay before sending messages.
+      max_tries: 3                                   # Optional. Number of times to resend until a 2XX status code is received.
+      message: '${service_id} - ${version} released' # Optional. Formatting of the message to send.
+      priority: 5                                    # Optional. Priority of the message.
+      title: 'Release notifier'                      # Optional. Title of the message.
+      extras:
+        android_action: ''                           # Optional. URL to open when a notification is received whilst GOtify is in focus.
+        client_display: 'text/plain'                 # Optional. Whether the message should be rendered in markdown or plain text. (Must be either 'text/plain' or 'text/markdown')
+        client_notification: ''                      # Optional. URL to open when the notification is clicked (Android).
+```
+The values of the optional arguments are the default values.
+
+message:
+- `${service_id}`  will be replaced with the ID.
+- `${service_url}` will be replaced with the URL.
+- `${version}`     will be replaced with the version that was found (e.g. `${version} = 10.6.3`).
+- `${monitor_id}`  will be replaced with the ID given to the parent (monitor element).
+
+extras:
+- `${service_url}` will be replaced with the URL.
+
+(of the service element that is triggering the message)
+
 ##### Monitor - Slack
 ```yaml
 monitor:
@@ -293,13 +380,13 @@ monitor:
       icon_emoji: ':github:'                                          # Optional. The emoji icon for that user.
       icon_url: ''                                                    # Optional. The URL of an icon for that user.
       delay: '0s'                                                     # Optional. The duration (AhBmCs where h is hours, m is minutes and s is seconds) to delay sending the message by.
-      maxtries: 3                                                     # Optional. The number of times to resend until a 2XX status code is received.
+      max_tries: 3                                                     # Optional. The number of times to resend until a 2XX status code is received.
 ```
 The values of the optional arguments are the default values.
 
 message:
 - `${service_id}`  will be replaced with the ID.
-- `${service_url}` will be replaced with the URL
+- `${service_url}` will be replaced with the URL.
 - `${version}`     will be replaced with the version that was found (e.g. `${version} = 10.6.3`).
 - `${monitor_id}`  will be replaced with the ID given to the parent (monitor element).
 
@@ -316,7 +403,7 @@ message:
       secret: "SECRET"       # Required. The secret to send the WebHook with.
       desired_status_code: 0 # Optional. Keep sending the WebHooks until we recieve this status code (0 = accept any 2XX code).
       delay: '0s'            # Optional. The duration (AhBmCs where h is hours, m is minutes and s is seconds) to delay sending the WebHook by.
-      maxtries: 3            # Optional. Number of times to try re-sending WebHooks until we receive desired_status_code
-      silent_fails: false    # Optional. Whether to send Slack messages to the Slacks of the Monitor when a WebHook fails maxtries times.
+      max_tries: 3            # Optional. Number of times to try re-sending WebHooks until we receive desired_status_code
+      silent_fails: false    # Optional. Whether to send Slack messages to the Slacks of the Monitor when a WebHook fails max_tries times.
 ```
 The values of the optional arguments are the default values.
