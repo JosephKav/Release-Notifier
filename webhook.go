@@ -26,7 +26,7 @@ type WebHook struct {
 	Secret            string `yaml:"secret,omitempty"`              // "SECRET"
 	DesiredStatusCode int    `yaml:"desired_status_code,omitempty"` // e.g. 202
 	Delay             string `yaml:"delay,omitempty"`               // The delay before sending the WebHook.
-	MaxTries          uint   `yaml:"maxtries,omitempty"`            // Number of times to attempt sending the WebHook if the desired status code is not received.
+	MaxTries          uint   `yaml:"max_tries,omitempty"`           // Number of times to attempt sending the WebHook if the desired status code is not received.
 	SilentFails       string `yaml:"silent_fails,omitempty"`        // Whether to notify if this WebHook fails MaxTries times.
 }
 
@@ -135,7 +135,7 @@ func randAlphaNumericLower(n int) string {
 }
 
 // send will send every WebHook in this WebHookSlice with a delay between each webhook.
-func (w *WebHookSlice) send(monitorID string, serviceID string, slacks SlackSlice) {
+func (w *WebHookSlice) send(monitorID string, serviceID string, gotifys GotifySlice, gotifyDefaults Gotify, slacks SlackSlice) {
 	for index := range *w {
 		go func() {
 			index := index                    // Create new instance for the goroutine.
@@ -167,6 +167,7 @@ func (w *WebHookSlice) send(monitorID string, serviceID string, slacks SlackSlic
 							ID: serviceID,
 						}
 						slacks.send(monitorID, &svc, msg)
+						gotifys.send(monitorID, &svc, "WebHook fail", msg, gotifyDefaults)
 					}
 					msg = fmt.Sprintf("%s (%s), %s", serviceID, monitorID, msg)
 					jLog.Error(msg, true)

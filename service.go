@@ -28,11 +28,13 @@ type Service struct {
 	ProgressiveVersioning string          `yaml:"progressive_versioning"` // default - true  = Version has to be greater than the previous to trigger Slack(s)/WebHook(s).
 	RegexContent          string          `yaml:"regex_content"`          // "abc-[a-z]+-${version}_amd64.deb" This regex must exist in the body of the URL to trigger new version actions.
 	RegexVersion          string          `yaml:"regex_version"`          // "v*[0-9.]+" The version found must match this release to trigger new version actions.
+	SkipGotify            bool            `yaml:"skip_gotify"`            // default - false = Don't skip Gotify messages for new releases.
 	SkipSlack             bool            `yaml:"skip_slack"`             // default - false = Don't skip Slack messages for new releases.
 	SkipWebHook           bool            `yaml:"skip_webhook"`           // default - false = Don't skip WebHooks for new releases.
 	IgnoreMiss            string          `yaml:"ignore_misses"`          // Ignore URLCommands that fail (e.g. split on text that doesn't exist)
 	AccessToken           string          `yaml:"access_token"`           // GitHub access token to use.
 	AllowInvalidCerts     string          `yaml:"allow_invalid"`          // default - false = Disallows invalid HTTPS certificates.
+	Gotify                Gotify          `yaml:"gotify"`                 // Override Gotify message vars.
 	Slack                 Slack           `yaml:"slack"`                  // Override Slack message vars.
 	status                status          ``                              // Track the Status of this source (version and regex misses).
 }
@@ -608,7 +610,7 @@ func (s *Service) query(index int, monitorID string) bool {
 			msg := fmt.Sprintf("%s (%s), Starting Release - %s", s.ID, monitorID, version)
 			jLog.Info(msg, true)
 			// Don't notify on first version.
-			return false
+			return true
 		}
 
 		// New version found.

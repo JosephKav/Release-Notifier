@@ -27,6 +27,7 @@ type Config struct {
 
 // Defaults is the global default for vars.
 type Defaults struct {
+	Gotify  Gotify  `yaml:"gotify"`
 	Service Service `yaml:"service"`
 	Slack   Slack   `yaml:"slack"`
 	WebHook WebHook `yaml:"webhook"`
@@ -41,6 +42,14 @@ func (d *Defaults) setDefaults() {
 	d.Service.ProgressiveVersioning = stringBool(d.Service.ProgressiveVersioning, "", "", true)
 	d.Service.checkValues("defaults", 0, true)
 
+	// Gotify defaults.
+	d.Gotify.Delay = valueOrValueString(d.Gotify.Delay, "0s")
+	d.Gotify.MaxTries = valueOrValueUInt(d.Gotify.MaxTries, 3)
+	d.Gotify.Message = valueOrValueString(d.Gotify.Message, "${service_id} - ${version} released")
+	d.Gotify.Priority = valueOrValueString(d.Gotify.Priority, "5")
+	d.Gotify.Title = valueOrValueString(d.Gotify.Title, "Release notifier")
+	d.Gotify.checkValues("defaults", 0, true)
+
 	// Slack defaults.
 	d.Slack.Delay = valueOrValueString(d.Slack.Delay, "0s")
 	if d.Slack.IconEmoji == "" && d.Slack.IconURL == "" {
@@ -53,8 +62,8 @@ func (d *Defaults) setDefaults() {
 
 	// WebHook defaults.
 	d.WebHook.Delay = valueOrValueString(d.WebHook.Delay, "0s")
-	d.WebHook.DesiredStatusCode = valueOrValueInt(d.WebHook.DesiredStatusCode, 0)
 	d.WebHook.MaxTries = valueOrValueUInt(d.WebHook.MaxTries, 3)
+	d.WebHook.DesiredStatusCode = valueOrValueInt(d.WebHook.DesiredStatusCode, 0)
 	d.WebHook.SilentFails = stringBool(d.WebHook.SilentFails, "", "", false)
 	d.WebHook.checkValues("defaults", 0, true)
 }
@@ -69,6 +78,26 @@ func (d *Defaults) print() {
 	fmt.Printf("    ignore_miss: %s\n", d.Service.IgnoreMiss)
 	fmt.Printf("    interval: %s\n", d.Service.Interval)
 	fmt.Printf("    progressive_versioning: %s\n", d.Service.ProgressiveVersioning)
+
+	// Gotify defaults.
+	fmt.Println("  gotify:")
+	fmt.Printf("    delay: %s\n", d.Gotify.Delay)
+	fmt.Printf("    max_tries: %d\n", d.Gotify.MaxTries)
+	fmt.Printf("    message: '%s'\n", d.Gotify.Message)
+	fmt.Printf("    priority: %s\n", d.Gotify.Priority)
+	fmt.Printf("    title: '%s'\n", d.Gotify.Title)
+	if d.Gotify.Extras != (GotifyExtras{}) {
+		fmt.Println("    extras:")
+		if d.Gotify.Extras.AndroidAction != "" {
+			fmt.Printf("      android_action: '%s'\n", d.Gotify.Extras.AndroidAction)
+		}
+		if d.Gotify.Extras.ClientDisplay != "" {
+			fmt.Printf("      client_display: '%s'\n", d.Gotify.Extras.ClientDisplay)
+		}
+		if d.Gotify.Extras.ClientNotification != "" {
+			fmt.Printf("      client_notification: '%s'\n", d.Gotify.Extras.ClientNotification)
+		}
+	}
 
 	// Slack defaults.
 	fmt.Println("  slack:")
@@ -90,11 +119,11 @@ func (d *Defaults) print() {
 // getConf reads file as Config.
 func (c *Config) getConf(file string) *Config {
 	data, err := ioutil.ReadFile(file)
-	msg := fmt.Sprintf("ERROR: data.Get err\n%s ", err)
-	jLog.Error(msg, err != nil)
+	msg := fmt.Sprintf("Error reading '%s'\n%s ", file, err)
+	jLog.Fatal(msg, err != nil)
 
 	err = yaml.Unmarshal(data, c)
-	msg = fmt.Sprintf("ERROR: Unmarshal\n%s", err)
+	msg = fmt.Sprintf("Unmarshal of '%s' failed\n%s", file, err)
 	jLog.Fatal(msg, err != nil)
 	return c
 }
@@ -105,6 +134,7 @@ func (c *Config) setDefaults() *Config {
 	for monitorIndex := range c.Monitor {
 		monitor := &c.Monitor[monitorIndex]
 		monitor.Service.setDefaults(monitor.ID, c.Defaults)
+		monitor.Gotify.setDefaults(monitor.ID, c.Defaults)
 		monitor.Slack.setDefaults(monitor.ID, c.Defaults)
 		monitor.WebHook.setDefaults(monitor.ID, c.Defaults)
 	}
@@ -184,7 +214,7 @@ func main() {
 
 	// Track all targets for changes in version and act on any
 	// found changes.
-	(&config).Monitor.track()
+	(&config).Monitor.track(config.Defaults)
 
 	select {}
 }
