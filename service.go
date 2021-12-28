@@ -610,7 +610,7 @@ func (s *Service) query(index int, monitorID string) bool {
 			msg := fmt.Sprintf("%s (%s), Starting Release - %s", s.ID, monitorID, version)
 			jLog.Info(msg, true)
 			// Don't notify on first version.
-			return true
+			return false
 		}
 
 		// New version found.
