@@ -1,3 +1,6 @@
+# Project Moved
+This project has been renamed to Hymenaios and moved to [hymenaios-io/Hymenaios](https://github.com/hymenaios-io/Hymenaios). Head over there and you should be able to find a demo of what it looks like/does.
+
 # Release-Notifier
 [![Go Report Card](https://goreportcard.com/badge/github.com/JosephKav/Release-Notifier)](https://goreportcard.com/report/github.com/JosephKav/Release-Notifier)
 [![Build](https://github.com/JosephKav/Release-Notifier/actions/workflows/build.yml/badge.svg)](https://github.com/JosephKav/Release-Notifier/actions/workflows/build.yml)
